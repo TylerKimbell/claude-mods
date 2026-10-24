@@ -145,6 +145,54 @@ describe('agent-progress', () => {
     }
   })
 
+  test("the main thread's turn shows a working row, then a dim summary", async ($, on) => {
+    const clock = mock.clock(on, { now: 1_000_000 })
+    world(on)
+    on('turn.start', ($, e) => ({ turnId: e.turnId }))
+    on('tool.call', () => ({ result: 'ran' }))
+    await $.session.start({ ...session, surface: 'terminal' })
+    const ui = await $.ui.mount({ plugin: 'agent-progress', surface: 'terminal', component: 'AbovePrompt', props: band })
+    expect(await ui.find({ type: 'Text', text: /Working/ })).toBe(undefined)
+
+    await $.turn.start({ text: 'go', turnId: 't-main' })
+    expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toContain('0 tool calls')
+
+    await $.tool.call({ tool: 'Bash', command: 'npm test' })
+    await clock.advance(65_000)
+    // The clock redraws every 2 seconds, so the row reads 1:04 or 1:05.
+    const row = String((await ui.find({ type: 'Text', text: /Working/ }))?.text)
+    expect(row).toContain('· 1:0')
+    expect(row).toContain('1 tool call ·')
+    expect(row).toContain('Bash npm test')
+
+    await $.tool.call({ tool: 'Edit', file_path: 'C:\\app\\src\\index.ts', old_string: 'a', new_string: 'b' })
+    expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toContain('2 tool calls · Edit index.ts')
+
+    await $.turn.complete({ answer: 'done', durationMs: 65_000, isAborted: false, turnId: 't-main', reason: 'answer' } as AnsweredTurn)
+    expect(await ui.find({ type: 'Text', text: /Working/ })).toBe(undefined)
+    expect(String((await ui.find({ type: 'Text', text: /Last turn/ }))?.text)).toContain('1:05 · 2 tool calls')
+
+    // The next turn replaces the summary.
+    await $.turn.start({ text: 'again', turnId: 't-main-2' })
+    expect(await ui.find({ type: 'Text', text: /Last turn/ })).toBe(undefined)
+    expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toContain('0 tool calls')
+    await ui.unmount()
+  })
+
+  test("a subagent's tool calls do not count toward the main thread's row", async ($, on) => {
+    mock.clock(on, { now: 1_000_000 })
+    world(on)
+    on('turn.start', ($, e) => ({ turnId: e.turnId }))
+    on('tool.call', () => ({ result: 'ran' }))
+    await $.session.start({ ...session, surface: 'terminal' })
+    const ui = await $.ui.mount({ plugin: 'agent-progress', surface: 'terminal', component: 'AbovePrompt', props: band })
+    await $.turn.start({ text: 'go', turnId: 't-main' })
+    await $.agent.spawn(spawn('1'))
+    await $.tool.call({ tool: 'Bash', command: 'ls', agentId: 'agent-1' })
+    expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toContain('0 tool calls')
+    await ui.unmount()
+  })
+
   test('a fork keeps its prompt as given', async ($, on) => {
     mock.clock(on, { now: 1_000_000 })
     const w = world(on)

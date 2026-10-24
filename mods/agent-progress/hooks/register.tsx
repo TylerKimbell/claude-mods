@@ -5,7 +5,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { AgentRun, Bar, Panel } from '../types'
+import type { AgentRun, Bar, Panel, Work } from '../types'
 
 const PANE = 'agent-progress'
 const STEP_TOOL = 'mcp__agent-progress__step'
@@ -18,6 +18,27 @@ const panel = atom({ plugin: 'agent-progress', key: 'panel' } as const, {
   isDoneCollapsed: false,
   hasAutoOpened: false,
 } as Panel)
+const work = atom({ plugin: 'agent-progress', key: 'work' } as const, null as Work | null)
+
+// How often the working row's clock redraws while a turn runs.
+const WORK_TICK_MS = 2_000
+
+/** A few words naming a tool call: the tool and its file, command or task. */
+const describeTool = (e: Record<string, unknown>): string => {
+  const tool = String(e.tool ?? '').replace(/^mcp__/, '')
+  const path = typeof e.file_path === 'string' ? e.file_path.replace(/\\/g, '/').split('/').pop() : ''
+  if (path) return `${tool} ${path}`
+  if (typeof e.command === 'string') return `${tool} ${e.command.trim().slice(0, 32)}`
+  if (tool === 'Agent' && typeof e.description === 'string') return `Agent: ${e.description.slice(0, 32)}`
+  if (typeof e.pattern === 'string') return `${tool} ${e.pattern.slice(0, 24)}`
+  return tool
+}
+
+const workText = (w: Work, now: number): string => {
+  const calls = `${w.tools} tool ${w.tools === 1 ? 'call' : 'calls'}`
+  if (w.endedAt !== undefined) return `Last turn · ${fmtTime(w.endedAt - w.startedAt)} · ${calls}`
+  return `● Working · ${fmtTime(now - w.startedAt)} · ${calls}${w.last ? ` · ${w.last}` : ''}`
+}
 
 const ACCENT = '#8f8cf4'
 const DONE = '#5fbf8f'
@@ -225,6 +246,25 @@ export const register: Register = (on, options) => {
   const ticker: Ticker = { pending: new Map(), isTicking: false }
   const shouldAutoOpen = () => options.autoOpen !== false
   const shouldAskForSteps = () => options.askForSteps !== false
+  let workTick: { cancel: () => void } | null = null
+
+  // --- the main thread's own turn: a working row with elapsed time and tool calls.
+  on('turn.start', async ($, e, next) => {
+    if (e.agentId) return next(e)
+    const at = await $.clock.now()
+    await update($, work, () => ({ startedAt: at, tools: 0, last: '' }))
+    workTick?.cancel()
+    workTick = $.clock.every(WORK_TICK_MS, () => $.ui.invalidate('ui.render'))
+    return next(e)
+  })
+
+  on('tool.call', async ($, e, next) => {
+    if (!e.agentId && e.tool !== STEP_TOOL) {
+      const last = describeTool(e as unknown as Record<string, unknown>)
+      await update($, work, w => (w && w.endedAt === undefined ? { ...w, tools: w.tools + 1, last } : w))
+    }
+    return next(e)
+  })
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
@@ -330,6 +370,12 @@ export const register: Register = (on, options) => {
 
   on('turn.complete', async ($, e, next) => {
     const agentId = e.agentId
+    if (!agentId) {
+      workTick?.cancel()
+      workTick = null
+      const at = await $.clock.now()
+      await update($, work, w => (w && w.endedAt === undefined ? { ...w, endedAt: at } : w))
+    }
     if (agentId) {
       // The run's last requests land before it is marked done.
       await flush($, ticker)
@@ -457,19 +503,42 @@ export const register: Register = (on, options) => {
   // --- the band above the prompt
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const b = await read($, bar)
-    if (b === null || e.props.hasSurvey) return next(e)
+    const w = await read($, work)
+    if ((b === null && w === null) || e.props.hasSurvey) return next(e)
 
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
     // Other mods' rows stay in the band; an empty Box when nothing sits beneath.
     const rest = await next(e).catch(() => Box({ children: [] }))
+    const now = await $.clock.now()
+
+    // The main thread's row: live while the turn runs, a dim summary after it.
+    const workRow =
+      w === null ? null : w.endedAt === undefined ? (
+        <Text color={ACCENT}>{workText(w, now)}</Text>
+      ) : (
+        <Box flexDirection="row" gap={1}>
+          <Text dimColor>{workText(w, now)}</Text>
+          <Button key="agent-progress-work-dismiss" label="✕" plain role="dismiss" onPress={() => update($, work, () => null)} />
+        </Box>
+      )
+
+    if (b === null) {
+      return (
+        <Box flexDirection="column">
+          {rest}
+          {workRow}
+        </Box>
+      )
+    }
+
     const list = await read($, agents)
     const percent = `${Math.round(ratio(b) * 100)}%`
     const crew = <Button key="agent-progress-crew" label={`×${list.length}`} plain onPress={() => void togglePane($)} />
     const dismiss = <Button key="agent-progress-dismiss" label="✕" plain role="dismiss" onPress={() => update($, bar, () => null)} />
     const alt = `Subagents: ${barLabel(b)}, ${percent}`
 
-    // The terminal draws the row in text; every other surface gets one SVG.
+    // The terminal draws the subagent row in text; every other surface gets one SVG.
     if (e.surface !== 'terminal' && 'Svg' in ui) {
       const { Svg } = ui
       // About 8 CSS px per reported column; the rest is the count, the dismiss and their gaps.
@@ -482,6 +551,7 @@ export const register: Register = (on, options) => {
             {crew}
             {dismiss}
           </Box>
+          {workRow}
         </Box>
       )
     }
@@ -501,6 +571,7 @@ export const register: Register = (on, options) => {
           {crew}
           {dismiss}
         </Box>
+        {workRow}
       </Box>
     )
   })

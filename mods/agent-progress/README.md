@@ -6,7 +6,8 @@ Based on [Barncore's agent-watch](https://github.com/Barncore/agent-watch), a fo
 
 ## What you see
 
-- **The band**: `Subagents 2/5 · 3 running`, a bar, a percentage, a `×5` button that opens the pane, and `✕` to dismiss. The bar appears when the first subagent starts and reads Done when the last one finishes. It clears when you send your next prompt.
+- **The working row**: while Claude's own turn runs, `● Working · 0:42 · 7 tool calls · Edit register.tsx`, from the engine's turn and tool events alone, so it costs no tokens. When the turn ends it becomes a dim `Last turn · 1:23 · 9 tool calls` with a `✕`, replaced by the next turn. The engine does not know how far through a task Claude is, so this row shows time and activity, not a percentage.
+- **The subagent bar**: `Subagents 2/5 · 3 running`, a bar, a percentage, a `×5` button that opens the pane, and `✕` to dismiss. The bar appears when the first subagent starts and reads Done when the last one finishes. It clears when you send your next prompt.
 - **The pane**: totals at the top (estimated cost, tokens, time), then running and finished subagents. Each row has the task description, agent type, model and effort, a progress bar (the subagent's own steps when it reports them, otherwise its context fill in grey), and `ctx %`, tokens, cost and elapsed time. Collapse to a row of status glyphs.
 
 Cost is an estimate from token counts and a built-in price table, not a bill.
