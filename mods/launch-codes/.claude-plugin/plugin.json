@@ -1,0 +1,21 @@
+{
+  "name": "launch-codes",
+  "version": "0.1.0",
+  "description": "Risky commands need launch codes: a red alert pane, a 4-character code to arm, and a LAUNCH to fire. Guards Bash and PowerShell, and edits to .env files. Adapted from OneWave AI's launch-codes (MIT).",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "protectEnv": {
+      "type": "boolean",
+      "title": "Guard .env files",
+      "description": "Edits and writes to .env files (not .env.example) also need launch codes",
+      "default": true
+    },
+    "codeSeconds": {
+      "type": "number",
+      "title": "Code lifetime (seconds)",
+      "description": "How long a launch code stays valid before it expires",
+      "default": 45
+    }
+  }
+}

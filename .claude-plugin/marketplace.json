@@ -3,6 +3,16 @@
   "owner": { "name": "TylerKimbell" },
   "plugins": [
     {
+      "name": "agent-progress",
+      "source": "./mods/agent-progress",
+      "description": "A progress bar above the prompt for the subagents Claude starts, and an Agents pane with each one's model, step progress, context, estimated cost and time."
+    },
+    {
+      "name": "launch-codes",
+      "source": "./mods/launch-codes",
+      "description": "Risky Bash and PowerShell commands and .env edits need launch codes: a red alert pane, a 4-character code to arm, and a LAUNCH to fire."
+    },
+    {
       "name": "mod-template",
       "source": "./mods/_template",
       "description": "Starter mod: copy this folder to begin a new mod."

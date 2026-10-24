@@ -1,0 +1,21 @@
+{
+  "name": "agent-progress",
+  "version": "0.1.0",
+  "description": "A progress bar above the prompt for the subagents Claude starts, and an Agents pane with each one's model, step progress, context, estimated cost and time. Based on Barncore's agent-watch and johnnyvizz's savvy-progress (MIT).",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "autoOpen": {
+      "type": "boolean",
+      "title": "Open the Agents pane automatically",
+      "description": "Open the pane the first time a subagent starts in a session",
+      "default": true
+    },
+    "askForSteps": {
+      "type": "boolean",
+      "title": "Ask subagents to report steps",
+      "description": "Adds one line to each subagent's brief asking it to report its progress through the step tool, so its row shows a real progress bar",
+      "default": true
+    }
+  }
+}

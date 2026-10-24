@@ -186,3 +186,15 @@ Install as is:
 Dropped: next-steps (one model call per turn), secret-box (not needed now).
 
 Still open: GitHub owner and repo name, public or private, and build order.
+
+## 6. Status (2026-10-24, evening)
+
+Installed on this machine at user scope through the CLI (`AppData\Roaming\Claude\claude-code\<version>\claude.exe`, which the desktop app bundles but does not put on PATH):
+- filetree 0.4.1, cache-clock 0.5.4 (onWarning set to off), usage-quota 0.1.6
+- agent-progress 0.1.0 and launch-codes 0.1.0, read live from this checkout, which is added as a folder marketplace named `claude-mods`
+
+Built in this repo:
+- `mods/launch-codes`: Bash and PowerShell classifiers, the code ceremony through the engine's ask dialog, .env guard, 117 tests.
+- `mods/agent-progress`: band + pane, step tool, per-subagent prompt note, batched usage writes, tests.
+
+New sessions in the desktop app load all five. An open session needs `/reload-plugins` or a restart.

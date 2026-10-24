@@ -24,7 +24,21 @@ Requires Claude Code 2.1.287 or later. A private repo installs only for people w
 
 | Mod | What it does |
 | --- | --- |
+| [`agent-progress`](mods/agent-progress/README.md) | A progress bar above the prompt for the subagents Claude starts, and an Agents pane with each one's model, step progress, context, estimated cost and time. `/agents` toggles the pane. |
+| [`launch-codes`](mods/launch-codes/README.md) | Risky Bash and PowerShell commands (rm -rf, force push, reset --hard, DROP TABLE, curl piped into sh, disk formats) and `.env` edits need a 4-character code typed by you, then a LAUNCH. `/launch-codes test <command>` checks a command. |
 | `mod-template` | Starter folder to copy for a new mod. |
+
+## Mods we install from elsewhere
+
+Not in this repo, but part of the standard setup:
+
+| Mod | Install |
+| --- | --- |
+| [filetree](https://github.com/data-goblin/claude-code-filetree): live file tree, files shimmer as Claude reads, writes and commits | `claude plugin install filetree --marketplace data-goblin/claude-code-filetree` |
+| [cache-clock](https://github.com/ray-amjad/claude-code-mods): context fill and a countdown to prompt-cache expiry in the band | `claude plugin install cache-clock --marketplace ray-amjad/claude-code-mods`, then set its `onWarning` option to `off` |
+| [usage-quota](https://github.com/anantraghunath/claude-code-usage-quota-mod): 5-hour and weekly plan usage with a forecast, polled every 2 minutes | `claude plugin install usage-quota --marketplace anantraghunath/claude-code-usage-quota-mod` |
+
+Read a mod's source before installing it.
 
 ## Develop a mod
 

@@ -1,0 +1,12 @@
+This repository adapts code from the following MIT-licensed projects. Their
+copyright notices are retained here as the MIT License requires.
+
+mods/agent-progress
+  Based on agent-watch, Copyright (c) 2026 Barncore
+  https://github.com/Barncore/agent-watch
+  which is a fork of savvy-progress, Copyright (c) 2026 johnnyvizz
+  https://github.com/JohnnyVizz/claude-kit/tree/main/plugins/savvy-progress
+
+mods/launch-codes
+  Based on launch-codes, Copyright (c) 2026 Claude Code Mods contributors (OneWave AI)
+  https://github.com/OneWave-AI/claude-code-mods/tree/main/launch-codes
