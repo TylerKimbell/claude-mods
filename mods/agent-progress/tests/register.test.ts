@@ -179,6 +179,24 @@ describe('agent-progress', () => {
     await ui.unmount()
   })
 
+  test('the working row draws on the desktop too, with and without a subagent bar', async ($, on) => {
+    mock.clock(on, { now: 1_000_000 })
+    world(on)
+    on('turn.start', ($, e) => ({ turnId: e.turnId }))
+    on('tool.call', () => ({ result: 'ran' }))
+    await $.session.start(session)
+    const ui = await $.ui.mount({ plugin: 'agent-progress', surface: 'desktop', component: 'AbovePrompt', props: band })
+    await $.turn.start({ text: 'go', turnId: 't-main' })
+    expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toContain('0 tool calls')
+    expect(await ui.find({ type: 'Text', text: /^other mod$/ })).toBeTruthy()
+    await $.agent.spawn(spawn('1'))
+    expect(await barAlt(ui)).toBe('Subagents: 0/1, 0%')
+    expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toContain('Working')
+    await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 't-main', reason: 'answer' } as AnsweredTurn)
+    expect(String((await ui.find({ type: 'Text', text: /Last turn/ }))?.text)).toContain('0 tool calls')
+    await ui.unmount()
+  })
+
   test("a subagent's tool calls do not count toward the main thread's row", async ($, on) => {
     mock.clock(on, { now: 1_000_000 })
     world(on)
