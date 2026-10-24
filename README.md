@@ -1,4 +1,4 @@
-# tam-mods
+# claude-mods
 
 Claude Code mods we build and share. One repository, one marketplace, one folder per mod under `mods/`.
 
@@ -7,16 +7,16 @@ Claude Code mods we build and share. One repository, one marketplace, one folder
 At the prompt of a terminal `claude` session:
 
 ```
-/plugin install <mod> --marketplace <owner>/<repo>
+/plugin install <mod> --marketplace TylerKimbell/claude-mods
 ```
 
 From a shell:
 
 ```
-claude plugin install <mod> --marketplace <owner>/<repo>
+claude plugin install <mod> --marketplace TylerKimbell/claude-mods
 ```
 
-In the Claude desktop app (where `/plugin` does not run): click **+** next to the prompt box, then **Plugins**, **Add marketplace** with `<owner>/<repo>`, then **Add plugin**. New sessions load it; in an open session run `/reload-plugins`.
+In the Claude desktop app (where `/plugin` does not run): click **+** next to the prompt box, then **Plugins**, **Add marketplace** with `TylerKimbell/claude-mods`, then **Add plugin**. New sessions load it; in an open session run `/reload-plugins`.
 
 Requires Claude Code 2.1.287 or later. A private repo installs only for people who can read it on GitHub and have a git credential for github.com on their machine.
 
@@ -43,7 +43,7 @@ Load a mod in every local session while developing by adding its folder to `CLAU
 
 ```
 claude plugin marketplace add <path to this checkout>
-claude plugin install <mod>@tam-mods
+claude plugin install <mod>@claude-mods
 ```
 
 Check a mod before committing:

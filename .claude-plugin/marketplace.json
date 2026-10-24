@@ -1,6 +1,6 @@
 {
-  "name": "tam-mods",
-  "owner": { "name": "tam" },
+  "name": "claude-mods",
+  "owner": { "name": "TylerKimbell" },
   "plugins": [
     {
       "name": "mod-template",
