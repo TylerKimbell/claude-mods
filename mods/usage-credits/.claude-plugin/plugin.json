@@ -1,0 +1,21 @@
+{
+  "name": "usage-credits",
+  "version": "0.1.0",
+  "description": "Your usage credits (the pool Fable draws on) above the prompt: dollars left of the monthly limit and percent used, refreshed from your account every few minutes, with a warning toast as it runs low.",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "pollMinutes": {
+      "type": "number",
+      "title": "Refresh every (minutes)",
+      "description": "How often to ask the account for the credit balance; it is also refreshed after each turn, at most once a minute",
+      "default": 5
+    },
+    "warnAt": {
+      "type": "number",
+      "title": "Warn at (percent used)",
+      "description": "A toast when usage crosses this percent, and again at 95",
+      "default": 80
+    }
+  }
+}

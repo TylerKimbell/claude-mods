@@ -13,6 +13,11 @@
       "description": "Risky Bash and PowerShell commands and .env edits need launch codes: a red alert pane, a 4-character code to arm, and a LAUNCH to fire."
     },
     {
+      "name": "usage-credits",
+      "source": "./mods/usage-credits",
+      "description": "Usage credits (the pool Fable draws on) above the prompt: dollars left of the monthly limit and percent used, refreshed from your account, with a warning as it runs low."
+    },
+    {
       "name": "mod-template",
       "source": "./mods/_template",
       "description": "Starter mod: copy this folder to begin a new mod."
