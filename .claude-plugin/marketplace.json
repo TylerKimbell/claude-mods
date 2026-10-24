@@ -1,0 +1,11 @@
+{
+  "name": "tam-mods",
+  "owner": { "name": "tam" },
+  "plugins": [
+    {
+      "name": "mod-template",
+      "source": "./mods/_template",
+      "description": "Starter mod: copy this folder to begin a new mod."
+    }
+  ]
+}
