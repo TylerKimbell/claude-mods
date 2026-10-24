@@ -500,6 +500,17 @@ export const register: Register = (on, options) => {
     )
   })
 
+  // --- the spinner line: the row that animates while a turn runs. The band above the
+  // prompt is shared, and a mod above this one may draw it without passing the draw
+  // down, so the tool count and the last tool ride the spinner's own suffix as well.
+  on('ui.render', { component: 'Spinner' }, async ($, e, next) => {
+    const w = await read($, work)
+    if (w === null || w.endedAt !== undefined) return next(e)
+    const calls = `${w.tools} tool ${w.tools === 1 ? 'call' : 'calls'}`
+    const suffix = `${e.props.suffix} · ${calls}${w.last ? ` · ${w.last}` : ''}`
+    return next({ ...e, props: { ...e.props, suffix } })
+  })
+
   // --- the band above the prompt
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const b = await read($, bar)

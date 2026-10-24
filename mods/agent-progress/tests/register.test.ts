@@ -197,6 +197,31 @@ describe('agent-progress', () => {
     await ui.unmount()
   })
 
+  test('the spinner line carries the tool count while the turn runs', async ($, on) => {
+    mock.clock(on, { now: 1_000_000 })
+    on('session.start', ($, e) => ({ cwd: e.cwd }))
+    on('tool.register', ($, e) => ({ value: { tool: e.name } }))
+    on('command.register', ($, e) => ({ value: { command: e.name } }))
+    on('turn.start', ($, e) => ({ turnId: e.turnId }))
+    on('turn.complete', ($, e) => ({ text: e.answer }))
+    on('tool.call', () => ({ result: 'ran' }))
+    // The engine beneath draws the spinner from its props, as the surface would.
+    on('ui.render', ($, e) => $.ui.resolve(e).Text({ children: [`${(e.props as { word?: string }).word ?? ''}${(e.props as { suffix?: string }).suffix ?? ''}`] }))
+    await $.session.start(session)
+    const spinner = { word: 'Working', message: null, suffix: '…', mode: 'thinking' } as RenderPropsOf['Spinner']
+    for (const surface of ['desktop', 'terminal'] as const) {
+      const ui = await $.ui.mount({ plugin: 'agent-progress', surface, component: 'Spinner', requestId: 'main', props: spinner })
+      // No turn: the spinner is the engine's own.
+      expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toBe('Working…')
+      await $.turn.start({ text: 'go', turnId: `t-${surface}` })
+      await $.tool.call({ tool: 'Bash', command: 'git status' })
+      expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toBe('Working… · 1 tool call · Bash git status')
+      await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: `t-${surface}`, reason: 'answer' } as AnsweredTurn)
+      expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toBe('Working…')
+      await ui.unmount()
+    }
+  })
+
   test("a subagent's tool calls do not count toward the main thread's row", async ($, on) => {
     mock.clock(on, { now: 1_000_000 })
     world(on)
