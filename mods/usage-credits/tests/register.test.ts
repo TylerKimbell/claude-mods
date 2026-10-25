@@ -23,10 +23,10 @@ const answer = (used: number, limit = 10000) =>
     spend: { used: { amount_minor: used, currency: 'USD', exponent: 2 }, limit: { amount_minor: limit, currency: 'USD', exponent: 2 }, percent: Math.round((used / limit) * 100), enabled: true },
   })
 
-type World = { fetches: number; toasts: string[]; store: Map<string, unknown>; used: number; status: number }
+type World = { fetches: number; toasts: string[]; store: Map<string, unknown>; used: number; status: number; lines: string[] }
 
 function world(on: On, used = 4249): World {
-  const w: World = { fetches: 0, toasts: [], store: new Map(), used, status: 200 }
+  const w: World = { fetches: 0, toasts: [], store: new Map(), used, status: 200, lines: [] }
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('session.authorize', () => ({ value: { handle: 'h', kind: 'bearer' as const } }))
@@ -44,7 +44,10 @@ function world(on: On, used = 4249): World {
     w.toasts.push((e as unknown as { text: string }).text)
     return { value: undefined }
   })
-  on('ui.status', () => ({ value: undefined }))
+  on('ui.status', ($, e) => {
+    w.lines.push(String((e as unknown as { text?: string }).text))
+    return { value: undefined }
+  })
   on('turn.complete', ($, e) => ({ text: e.answer }))
   on('ui.render', ($, e) => $.ui.resolve(e).Text({ children: ['other mod'] }))
   return w
@@ -74,7 +77,7 @@ describe('parsing', () => {
 })
 
 describe('usage-credits', () => {
-  test('the band shows the balance after the first refresh, on both surfaces', async ($, on) => {
+  test('the band shows the balance after the first refresh, on both surfaces', { options: { showBand: true } }, async ($, on) => {
     const clock = mock.clock(on, { now: 1_000_000 })
     const w = world(on)
     await $.session.start(session)
@@ -89,7 +92,19 @@ describe('usage-credits', () => {
     }
   })
 
-  test('/credits refreshes and answers the balance; hide and show toggle the row', async ($, on) => {
+  test('the status line under the prompt carries the balance by default, with no band row', async ($, on) => {
+    const clock = mock.clock(on, { now: 1_000_000 })
+    const w = world(on)
+    await $.session.start(session)
+    await clock.advance(1)
+    expect(w.lines[w.lines.length - 1]).toBe('Credits $57.51 left of $100 · 42%')
+    const ui = await $.ui.mount({ plugin: 'usage-credits', surface: 'desktop', component: 'AbovePrompt', props: band })
+    expect(await ui.find({ type: 'Text', text: /Credits/ })).toBe(undefined)
+    expect(await ui.find({ type: 'Text', text: /^other mod$/ })).toBeTruthy()
+    await ui.unmount()
+  })
+
+  test('/credits refreshes and answers the balance; hide and show toggle the row', { options: { showBand: true } }, async ($, on) => {
     const clock = mock.clock(on, { now: 1_000_000 })
     const w = world(on)
     await $.session.start(session)
@@ -138,7 +153,7 @@ describe('usage-credits', () => {
     expect(w.toasts[1]).toContain('nearly gone')
   })
 
-  test('a failed refresh keeps the last reading and says why', async ($, on) => {
+  test('a failed refresh keeps the last reading and says why', { options: { showBand: true } }, async ($, on) => {
     const clock = mock.clock(on, { now: 1_000_000 })
     const w = world(on)
     await $.session.start(session)

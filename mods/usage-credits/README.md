@@ -1,12 +1,12 @@
 # usage-credits
 
-Your usage credits above the prompt: dollars left of the monthly limit and percent used. This is the pool Fable 5.1 draws on, and the one the claude.ai usage page shows as credits, separate from the 5-hour and weekly plan windows that usage-quota tracks.
+Your usage credits in the status line under the prompt: dollars left of the monthly limit and percent used. This is the pool Fable 5.1 draws on, and the one the claude.ai usage page shows as credits, separate from the 5-hour and weekly plan windows that usage-quota tracks.
 
 ```
-◆ Credits $57.51 left of $100 · 42% used
+usage-credits  Credits $57.51 left of $100 · 42%
 ```
 
-Green under the warn level, amber above it, red from 95% or once the limit is reached. A dim note follows the row when the last refresh failed or the reading is stale.
+With the `showBand` option on, a row is drawn above the prompt as well: `◆ Credits $57.51 left of $100 · 42% used`, green under the warn level, amber above it, red from 95% or once the limit is reached, with a dim note when the last refresh failed or the reading is stale. It is off by default because the band is shared and usage-quota hides every mod seated beneath it there.
 
 ## Where the numbers come from
 
@@ -19,16 +19,13 @@ Only Claude subscriptions have usage credits. With an API key or a gateway there
 ## Commands
 
 - `/credits` refreshes now and prints the balance.
-- `/credits hide` and `/credits show` toggle the row. The `✕` on the row hides it too.
+- `/credits hide` and `/credits show` toggle the band row when `showBand` is on. The `✕` on the row hides it too.
 
 ## Options
 
 - `pollMinutes` (default 5): how often to refresh.
 - `warnAt` (default 80): a toast once usage crosses this percent, and another at 95.
-
-## Sharing the band
-
-The band above the prompt is shared with other mods. usage-quota draws it without passing the draw down while it is on, so any mod seated beneath it there is hidden. If this row does not appear while usage-quota is on, `/credits` still answers, and the row shows whenever the band is open.
+- `showBand` (default false): also draw the row above the prompt.
 
 ## Install
 

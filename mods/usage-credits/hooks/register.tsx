@@ -92,6 +92,10 @@ export const fmtMoney = (minor: number, exponent: number, currency: string): str
 
 export const leftOf = (c: Credits): number => Math.max(0, c.limitMinor - c.usedMinor)
 
+/** The status line under the prompt: short, since it shares the row with the engine's own notices. */
+export const statusText = (c: Credits): string =>
+  `Credits ${fmtMoney(leftOf(c), c.exponent, c.currency)} left of ${fmtMoney(c.limitMinor, c.exponent, c.currency)} · ${Math.round(c.percent)}%${c.isLimitReached ? ' · limit reached' : ''}`
+
 export const summary = (c: Credits): string =>
   `${fmtMoney(leftOf(c), c.exponent, c.currency)} left of ${fmtMoney(c.limitMinor, c.exponent, c.currency)} · ${Math.round(c.percent)}% used`
 
@@ -152,7 +156,7 @@ async function refresh($: EngineInterface, opts: RefreshOptions): Promise<Credit
     await update($, view, v => (v.error ? { ...v, error: '' } : v))
     await $.store.set(STORE_LAST, next)
     await warnIfCrossed($, next, opts.warnAt)
-    $.ui.status(`Credits ${fmtMoney(leftOf(next), next.exponent, next.currency)} left · ${Math.round(next.percent)}%`)
+    $.ui.status(statusText(next))
     return next
   } catch (err) {
     await update($, view, v => ({ ...v, error: String(err).slice(0, 60) }))
@@ -173,16 +177,20 @@ export const register: Register = (on, options) => {
     const p = Number(options.warnAt)
     return Number.isFinite(p) && p > 0 && p < 100 ? p : DEFAULT_WARN_AT
   }
+  const showBand = () => options.showBand === true
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     await $.command.register({
       name: 'credits',
-      description: 'Usage credits: /credits refreshes and shows the balance; /credits hide or show toggles the row above the prompt',
+      description: 'Usage credits: /credits refreshes and shows the balance; /credits hide or show toggles the optional row above the prompt',
     })
     // Last session's reading shows at once; the fresh one replaces it.
     const last = (await $.store.get(STORE_LAST)) as Credits | undefined
-    if (last && typeof last.limitMinor === 'number') await update($, credits, () => last)
+    if (last && typeof last.limitMinor === 'number') {
+      await update($, credits, () => last)
+      $.ui.status(statusText(last))
+    }
     // The first refresh runs right after the session is ready, off the start's own wait.
     $.clock.after(1, () => {
       void refresh($, { isForced: true, warnAt: warnAt() })
@@ -219,7 +227,7 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const c = await read($, credits)
     const v = await read($, view)
-    if (c === null || v.isHidden || e.props.hasSurvey) return next(e)
+    if (!showBand() || c === null || v.isHidden || e.props.hasSurvey) return next(e)
 
     const { Box, Text, Button } = $.ui.resolve(e)
     // Other mods' rows stay in the band; an empty Box when nothing sits beneath.

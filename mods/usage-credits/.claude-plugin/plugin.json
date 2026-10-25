@@ -1,7 +1,7 @@
 {
   "name": "usage-credits",
   "version": "0.1.0",
-  "description": "Your usage credits (the pool Fable draws on) above the prompt: dollars left of the monthly limit and percent used, refreshed from your account every few minutes, with a warning toast as it runs low.",
+  "description": "Your usage credits (the pool Fable draws on) in the status line under the prompt: dollars left of the monthly limit and percent used, refreshed from your account every few minutes, with a warning toast as it runs low.",
   "license": "MIT",
   "types": "./types/index.d.ts",
   "userConfig": {
@@ -16,6 +16,12 @@
       "title": "Warn at (percent used)",
       "description": "A toast when usage crosses this percent, and again at 95",
       "default": 80
+    },
+    "showBand": {
+      "type": "boolean",
+      "title": "Also draw a row above the prompt",
+      "description": "The status line under the prompt always shows the balance; this adds a row in the band above the prompt too",
+      "default": false
     }
   }
 }
