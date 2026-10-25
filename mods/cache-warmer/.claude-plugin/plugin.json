@@ -1,0 +1,33 @@
+{
+  "name": "cache-warmer",
+  "version": "0.1.0",
+  "description": "Keeps a big session's prompt cache warm while you are away: a few minutes before it would expire, one cheap tool-less request over the cached transcript restarts the clock. Capped by hours, skipped under a context size, and the cost is shown.",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "ttlMinutes": {
+      "type": "number",
+      "title": "Cache lifetime (minutes)",
+      "description": "How long the prompt cache lives after each request: 60 on a Claude subscription, 5 on some API setups",
+      "default": 60
+    },
+    "leadMinutes": {
+      "type": "number",
+      "title": "Ping this many minutes before expiry",
+      "default": 4,
+      "description": "How long before the cache would expire the ping goes out"
+    },
+    "maxHours": {
+      "type": "number",
+      "title": "Stop after this many idle hours",
+      "description": "Pings stop once the session has been idle this long; your next message starts a fresh run",
+      "default": 4
+    },
+    "minTokens": {
+      "type": "number",
+      "title": "Only warm a context of at least (tokens)",
+      "description": "Below this the saving is too small to bother",
+      "default": 100000
+    }
+  }
+}

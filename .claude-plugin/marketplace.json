@@ -8,6 +8,11 @@
       "description": "A progress bar above the prompt for the subagents Claude starts, and an Agents pane with each one's model, step progress, context, estimated cost and time."
     },
     {
+      "name": "cache-warmer",
+      "source": "./mods/cache-warmer",
+      "description": "Keeps a big session's prompt cache warm while you are away: one cheap request over the cached transcript a few minutes before expiry, capped by hours and context size, with the cost shown."
+    },
+    {
       "name": "launch-codes",
       "source": "./mods/launch-codes",
       "description": "Risky Bash and PowerShell commands and .env edits need launch codes: a red alert pane, a 4-character code to arm, and a LAUNCH to fire."
