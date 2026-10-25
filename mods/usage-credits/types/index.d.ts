@@ -17,6 +17,20 @@ export type Credits = {
   fetchedAt: number
 }
 
+/** One plan window: percent used, when it resets, and when this reading was taken. */
+export type Win = {
+  percent: number
+  /** ISO 8601; absent for a window that has not started. */
+  resetsAt?: string
+  at: number
+}
+
+/** The plan's two rate-limit windows, as the engine and the usage endpoint report them. */
+export type Windows = {
+  fiveHour?: Win
+  weekly?: Win
+}
+
 export type View = {
   isHidden: boolean
   /** The last error the refresh hit, shown dim beside a stale reading; empty when the last refresh worked. */
@@ -27,6 +41,7 @@ declare module 'claude-code' {
   interface PluginState {
     'usage-credits': {
       credits: Credits | null
+      windows: Windows
       view: View
     }
   }

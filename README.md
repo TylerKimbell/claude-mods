@@ -8,7 +8,7 @@ Clone this repo, open Claude Code in the folder, and say:
 
 > Follow SETUP.md to install all the mods on this machine.
 
-[SETUP.md](SETUP.md) installs every mod below plus filetree and usage-quota, in the order the band needs, and checks the result.
+[SETUP.md](SETUP.md) installs every mod below plus filetree, in the order that lays the band out, and checks the result.
 
 ## Install a mod
 
@@ -36,7 +36,8 @@ Requires Claude Code 2.1.287 or later. A private repo installs only for people w
 | [`cache-clock`](mods/cache-clock/README.md) | One line above the prompt: context used and a countdown until the prompt cache goes cold. A fork of Ray Amjad's cache-clock that also restarts the clock on cache-warmer's pings, with the handoff note off by default. |
 | [`cache-warmer`](mods/cache-warmer/README.md) | Keeps a big session's prompt cache warm while you are away: a cheap tool-less request over the cached transcript a few minutes before expiry, once per cache lifetime, capped at 4 idle hours and skipped under 100k tokens. `/warmer` shows pings, cost and what a cold return would have cost. |
 | [`launch-codes`](mods/launch-codes/README.md) | Risky Bash and PowerShell commands (rm -rf, force push, reset --hard, DROP TABLE, curl piped into sh, disk formats) and `.env` edits need a 4-character code typed by you, then a LAUNCH. `/launch-codes test <command>` checks a command. |
-| [`usage-credits`](mods/usage-credits/README.md) | Usage credits, the pool Fable draws on, in the status line under the prompt: `Credits $91.49 left`, your purchased balance, refreshed from your account. `/credits` adds this month's spend and any monthly limit; an option adds a band row too. |
+| [`usage-credits`](mods/usage-credits/README.md) | The status line under the prompt: `5h 10% · Weekly 2% · Credits $91.49 left`, the plan's two windows from the session after every reply and your purchased credit balance from your account. `/credits` adds the reset times and this month's spend. |
+| [`usage-quota`](mods/usage-quota/README.md) | The context band above the prompt: context use and its Messages, Tools and Other breakdown, one-click Compact and per-session Auto compact, in three rows. A fork of Anant Raghunath's usage-quota without the 5-hour and weekly meters or the polling, and one that passes the band on. `/quota` toggles it. |
 | `mod-template` | Starter folder to copy for a new mod. |
 
 ## Mods we install from elsewhere
@@ -46,13 +47,8 @@ Not in this repo, but part of the standard setup:
 | Mod | Install |
 | --- | --- |
 | [filetree](https://github.com/data-goblin/claude-code-filetree): live file tree, files shimmer as Claude reads, writes and commits | `claude plugin install filetree --marketplace data-goblin/claude-code-filetree` |
-| [usage-quota](https://github.com/anantraghunath/claude-code-usage-quota-mod): 5-hour and weekly plan usage with a forecast, polled every 2 minutes | `claude plugin install usage-quota --marketplace anantraghunath/claude-code-usage-quota-mod` |
 
 Read a mod's source before installing it.
-
-### Install usage-quota last
-
-Mods load in the order they were installed, and the band above the prompt is drawn in that order: each mod draws its row and passes the rest down. usage-quota draws its block without passing the draw down, so every mod installed after it loses its band row (cache-clock's countdown, agent-progress's bars). Install usage-quota after everything else. If it is already installed, uninstall and reinstall it to move it to the end.
 
 ## Develop a mod
 

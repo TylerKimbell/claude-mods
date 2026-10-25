@@ -1,6 +1,6 @@
 # Set up a machine
 
-This puts Tyler's full mod setup on a machine: the five mods in this repo plus two from other authors, in the order the band above the prompt needs. It is written for Claude Code to follow. Open Claude Code in this folder and say:
+This puts Tyler's full mod setup on a machine: the six mods in this repo plus filetree from another author. It is written for Claude Code to follow. Open Claude Code in this folder and say:
 
 > Follow SETUP.md to install all the mods on this machine.
 
@@ -15,24 +15,25 @@ Every step is safe to run again on a machine that already has some of this insta
 | 3 | `cache-clock@claude-mods` | this repo | Cache countdown and context in the band (our fork) |
 | 4 | `cache-warmer@claude-mods` | this repo | Keeps big sessions' cache warm while idle |
 | 5 | `launch-codes@claude-mods` | this repo | Code-and-LAUNCH guard on risky commands and .env edits |
-| 6 | `usage-credits@claude-mods` | this repo | Credits left, on the status line |
-| 7 | `usage-quota@claude-code-usage-quota-mod` | anantraghunath/claude-code-usage-quota-mod | 5-hour and weekly meters, context, Compact |
+| 6 | `usage-credits@claude-mods` | this repo | 5-hour and weekly use and credits left, on the status line |
+| 7 | `usage-quota@claude-mods` | this repo | The context band: context use, Compact, Auto compact (our fork) |
 
 Do **not** install these, on purpose:
 
-- `cache-clock@claude-code-mods` (Ray Amjad's original). Ours in `mods/cache-clock` replaces it. Having both draws two countdowns.
+- `cache-clock@claude-code-mods` (Ray Amjad's original). Ours in `mods/cache-clock` replaces it. Both together draw two countdowns.
+- `usage-quota@claude-code-usage-quota-mod` (Anant Raghunath's original). Ours in `mods/usage-quota` replaces it. The original also draws the 5-hour and weekly meters, polls the usage endpoint every two minutes (which gets refused with 429s), and hides every band row installed after it.
 - next-steps (spends tokens every turn) and secret-box (not needed).
 
-## The one rule that matters: usage-quota goes last
+## Install order
 
-Mods load in install order, and the band above the prompt is drawn in that order: each mod draws its row and passes the rest down. usage-quota draws its block and does not pass the draw down, so any mod installed after it loses its band row (cache-clock's countdown, agent-progress's bars). So usage-quota is installed last, and if anything is installed after it later, usage-quota is uninstalled with `--keep-data` and reinstalled to move it back to the end. Step 7 checks this.
+Mods load in install order, and the band above the prompt is drawn in that order: the first mod's row on top, each passing the rest down. Every mod here passes the draw down, so the order hides nothing; it only sets the layout. usage-quota goes last so the context band sits right above the prompt, with cache-clock's line at the top of the band. Step 7 checks it.
 
 ## Steps
 
 ### 1. Check what is needed
 
 - Claude Code 2.1.287 or later. `claude --version`, or step 2's path, prints it.
-- Signed in to Claude with a subscription. usage-quota and usage-credits read the plan's usage; with an API key they show nothing.
+- Signed in to Claude with a subscription. usage-credits reads the plan's usage and your credit balance; with an API key it shows nothing.
 - Git, and read access to TylerKimbell/claude-mods (this folder is a clone, so that is already true).
 - Mods do not load in WSL sessions of the desktop app. Use a native Windows, macOS or Linux session.
 
@@ -52,19 +53,20 @@ claude plugin list --json
 claude plugin marketplace list --json
 ```
 
-Then, before installing anything:
+Then, before installing anything, remove the originals our forks replace, if they are installed:
 
-- If `cache-clock@claude-code-mods` is installed, remove it: `claude plugin uninstall cache-clock@claude-code-mods`.
-- If `usage-quota@claude-code-usage-quota-mod` is installed, remove it for now, keeping its saved settings: `claude plugin uninstall usage-quota@claude-code-usage-quota-mod --keep-data`. Step 6 puts it back last.
+```bash
+claude plugin uninstall cache-clock@claude-code-mods
+claude plugin uninstall usage-quota@claude-code-usage-quota-mod
+```
 
-### 4. Add the three marketplaces
+### 4. Add the two marketplaces
 
 Skip any that `marketplace list` already shows.
 
 ```bash
 claude plugin marketplace add "<absolute path of this folder>"
 claude plugin marketplace add data-goblin/claude-code-filetree
-claude plugin marketplace add anantraghunath/claude-code-usage-quota-mod
 ```
 
 The first one adds this clone as a folder marketplace named `claude-mods`. Plugins from it are read straight from the folder, so a `git pull` here plus `/reload-plugins` in a session is all an update needs. If `claude-mods` is already added from GitHub (`TylerKimbell/claude-mods`) instead, that works too; updates then go through `claude plugin marketplace update claude-mods` and `claude plugin update <id>`.
@@ -87,12 +89,12 @@ Messages about userConfig options not being set are expected: every mod's defaul
 ### 6. Install usage-quota last
 
 ```bash
-claude plugin install usage-quota@claude-code-usage-quota-mod --scope user
+claude plugin install usage-quota@claude-mods --scope user
 ```
 
 ### 7. Check the load order
 
-A headless run loads every plugin and logs the order, even without a login. usage-quota must have the highest environment number.
+A headless run loads every plugin and logs the order, even without a login.
 
 ```bash
 T="${TMPDIR:-$TEMP}"
@@ -110,10 +112,10 @@ hooks module cache-clock@claude-mods loaded (worker, environment 3
 hooks module cache-warmer@claude-mods loaded (worker, environment 4
 hooks module launch-codes@claude-mods loaded (worker, environment 5
 hooks module usage-credits@claude-mods loaded (worker, environment 6
-hooks module usage-quota@claude-code-usage-quota-mod loaded (worker, environment 7
+hooks module usage-quota@claude-mods loaded (worker, environment 7
 ```
 
-The middle five may be in any order. If usage-quota is not last, or a line is missing, repeat step 6 after `claude plugin uninstall usage-quota@claude-code-usage-quota-mod --keep-data`, and install whatever is missing before it.
+The middle five may be in any order. If a line is missing, install that mod. If usage-quota is not last, nothing is hidden, but the context band is not at the bottom of the band: `claude plugin uninstall usage-quota@claude-mods` then step 6 moves it there. Any line naming `claude-code-mods` or `claude-code-usage-quota-mod` is an original that step 3 should have removed.
 
 ### 8. Load them and check them
 
@@ -122,15 +124,16 @@ Restart the desktop app, or start a new session (in an open session, `/reload-pl
 | Type | Expect |
 | --- | --- |
 | `/launch-codes test git push --force` | `Needs launch codes: git push --force rewrites remote history.` |
-| `/credits` | `Usage credits: $… left of $… · …% used` |
+| `/credits` | `Plan: 5-hour …% (resets in …) · weekly …% (resets in …)`, then `Usage credits: $… left · …` |
 | `/warmer` | `Cache warmer on · …` |
 | `/cache-clock` | the countdown line as text |
+| `/quota` | `Context band off.`, and again to turn it back on |
 | `/agents` | the Agents pane opens |
 
 And on screen, after sending any message:
 
-- The band above the prompt starts with cache-clock's `◷ cache 59:… left · ctx …` line, then usage-quota's block. agent-progress's subagent bar joins it whenever Claude runs subagents.
-- The status line under the prompt reads `usage-credits  Credits $… left of $… · …%`.
+- The band above the prompt has cache-clock's `◷ cache 59:… left · ctx …` line on top, then the context band: `Context …% used  …k free of 1M` with Auto compact, Compact and ▼ beside it, the context bar, and a `Messages · Tools · Other` row. agent-progress's subagent bar joins the band whenever Claude runs subagents.
+- The status line under the prompt reads `usage-credits  5h …% · Weekly …% · Credits $… left`.
 - A Files tab (filetree) sits beside the chat.
 
 The first time a new mod loads, the desktop app may ask whether to allow it. Allow it.
@@ -138,6 +141,6 @@ The first time a new mod loads, the desktop app may ask whether to allow it. All
 ## Later
 
 - **Updating this repo's mods**: `git pull` in this folder, then `/reload-plugins` in open sessions.
-- **Updating the other two**: `claude plugin marketplace update <marketplace>` then `claude plugin update <id>`, then re-run step 7.
-- **Adding another mod**: install it, then move usage-quota back to last (step 3's uninstall with `--keep-data`, then step 6), then step 7.
+- **Updating filetree**: `claude plugin marketplace update claude-code-filetree` then `claude plugin update filetree@claude-code-filetree`.
+- **Adding another mod**: install it. To keep the context band at the bottom of the band, reinstall usage-quota afterwards (uninstall, then step 6) and check with step 7.
 - **Removing everything**: `claude plugin uninstall <id>` for each id in the table.

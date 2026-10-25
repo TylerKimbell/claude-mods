@@ -1,14 +1,16 @@
 # usage-credits
 
-Your usage credits in the status line under the prompt: the dollars you have left. These are the credits Fable 5.1 and anything past your plan limits draw on, separate from the 5-hour and weekly plan windows that usage-quota tracks.
+Your plan's 5-hour and weekly use and your usage credits, in the status line under the prompt.
 
 ```
-usage-credits  Credits $91.49 left
+usage-credits  5h 10% · Weekly 2% · Credits $91.49 left
 ```
 
-That is your purchased balance, as the billing page's Usage credits section shows it. The line adds a flag only when something stops credits being spent: `· monthly limit reached` if you have a monthly spend limit and hit it, `· credits off` if usage credits are switched off.
+**5h** and **Weekly** are the plan's two rate-limit windows. They come from the engine after every reply, at no cost, and from the usage endpoint this mod already reads. Within one window the higher reading stands, since the per-reply figures are whole percents and can lag the service. A window whose reset has passed reads 0%. The `showWindows` option takes them off the line.
 
-`/credits` prints the longer form, with this month's spend: `$91.49 left · no monthly limit, $93.84 spent this month`, or `· this month $93.84 of $100 monthly limit (94%)` when a limit is set. The 80% and 95% toasts only fire when a monthly limit is set.
+**Credits** is your purchased balance, as the billing page's Usage credits section shows it. The line adds a flag only when something stops credits being spent: `· monthly limit reached` if you have a monthly spend limit and hit it, `· credits off` if usage credits are switched off.
+
+`/credits` prints the longer form: the two windows with their reset times (`Plan: 5-hour 10% (resets in 3h 11m) · weekly 2% (resets in 1d 17h)`), then the credits with this month's spend: `$91.49 left · no monthly limit, $93.84 spent this month`, or `· this month $93.84 of $100 monthly limit (94%)` when a limit is set. The 80% and 95% toasts only fire when a monthly limit is set.
 
 If the balance cannot be read, the line falls back to what a monthly limit still allows: `Credits $6.16 left of $100 · 94%`. The balance and the monthly-limit figures are read separately, so a refusal from one endpoint does not hold back the other.
 
@@ -35,7 +37,8 @@ Only Claude subscriptions have usage credits. With an API key or a gateway there
 
 - `pollMinutes` (default 5): how often to refresh.
 - `warnAt` (default 80): a toast once usage crosses this percent, and another at 95.
-- `showBand` (default false): also draw the row above the prompt.
+- `showWindows` (default true): show the 5-hour and weekly windows on the line.
+- `showBand` (default false): also draw the credits row above the prompt.
 
 ## Install
 

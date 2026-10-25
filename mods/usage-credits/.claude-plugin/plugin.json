@@ -1,7 +1,7 @@
 {
   "name": "usage-credits",
   "version": "0.1.0",
-  "description": "Your usage credits (the pool Fable draws on) in the status line under the prompt: dollars left of the monthly limit and percent used, refreshed from your account every few minutes, with a warning toast as it runs low.",
+  "description": "Your plan's 5-hour and weekly usage and your usage credits (the pool Fable draws on) on the status line under the prompt, refreshed from the session and your account, with a warning as a monthly limit nears.",
   "license": "MIT",
   "types": "./types/index.d.ts",
   "userConfig": {
@@ -22,6 +22,12 @@
       "title": "Also draw a row above the prompt",
       "description": "The status line under the prompt always shows the balance; this adds a row in the band above the prompt too",
       "default": false
+    },
+    "showWindows": {
+      "type": "boolean",
+      "title": "Show the 5-hour and weekly windows",
+      "description": "Put the plan's 5-hour and weekly usage on the status line, left of the credits",
+      "default": true
     }
   }
 }

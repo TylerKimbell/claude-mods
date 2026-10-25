@@ -4,11 +4,12 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Credits, View } from '../types'
+import type { Credits, View, Win, Windows } from '../types'
 
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
 const PROFILE_URL = 'https://api.anthropic.com/api/oauth/profile'
 const STORE_LAST = 'last'
+const STORE_WINDOWS = 'windows'
 const STORE_WARNED = 'warnedAt'
 const MIN_REFRESH_MS = 5 * 60_000
 const BACKOFF_MS = 15 * 60_000
@@ -17,6 +18,7 @@ const DEFAULT_WARN_AT = 80
 
 const credits = atom({ plugin: 'usage-credits', key: 'credits' } as const, null as Credits | null)
 const view = atom({ plugin: 'usage-credits', key: 'view' } as const, { isHidden: false, error: '' } as View)
+const windows = atom({ plugin: 'usage-credits', key: 'windows' } as const, {} as Windows)
 
 const GREEN = '#5fbf8f'
 const AMBER = '#d9a441'
@@ -118,6 +120,93 @@ export const summary = (c: Credits): string => {
   return `balance not available · ${month}`
 }
 
+// ---------------------------------------------------------------------------
+// The plan's 5-hour and weekly windows
+
+const WINDOW_KEY: Record<string, keyof Windows> = { five_hour: 'fiveHour', seven_day: 'weekly' }
+
+/** The two windows from the usage endpoint's answer (`utilization` is already a percent). */
+export const parseWindows = (text: string, at: number): Windows => {
+  let body: Record<string, { utilization?: number | null; resets_at?: string | null } | null>
+  try {
+    body = JSON.parse(text) as typeof body
+  } catch {
+    return {}
+  }
+  const out: Windows = {}
+  for (const [kind, key] of Object.entries(WINDOW_KEY)) {
+    const w = body?.[kind]
+    if (w && typeof w.utilization === 'number') out[key] = { percent: w.utilization, ...(w.resets_at ? { resetsAt: w.resets_at } : {}), at }
+  }
+  return out
+}
+
+/** The two windows from the engine's per-reply figures (`$.session.usage()`, `session.measure`). */
+export const windowsOfRateLimits = (list: readonly { kind: string; percentUsed: number; resetsAt?: string }[], at: number): Windows => {
+  const out: Windows = {}
+  for (const r of list) {
+    const key = WINDOW_KEY[r.kind]
+    if (key) out[key] = { percent: r.percentUsed, ...(r.resetsAt ? { resetsAt: r.resetsAt } : {}), at }
+  }
+  return out
+}
+
+const sameWindow = (a?: string, b?: string): boolean => a !== undefined && b !== undefined && Math.abs(Date.parse(a) - Date.parse(b)) < 10 * 60_000
+
+/**
+ * Folds a fresh reading into the kept one. Within one window the higher percent stands:
+ * the engine's per-reply figures are whole percents and can run behind the usage service.
+ * A different window (it reset) takes the newer reading.
+ */
+export const mergeWindows = (kept: Windows, fresh: Windows): Windows => {
+  const out: Windows = { ...kept }
+  for (const key of ['fiveHour', 'weekly'] as const) {
+    const a = kept[key]
+    const b = fresh[key]
+    if (!b) continue
+    if (!a) out[key] = b
+    else if (sameWindow(a.resetsAt, b.resetsAt)) out[key] = { ...(b.at >= a.at ? b : a), percent: Math.max(a.percent, b.percent), at: Math.max(a.at, b.at) }
+    else out[key] = b.at >= a.at ? b : a
+  }
+  return out
+}
+
+/** A window's percent now: 0 once its reset has passed. */
+const percentNow = (w: Win | undefined, now: number): number | undefined =>
+  w === undefined ? undefined : w.resetsAt !== undefined && Date.parse(w.resetsAt) <= now ? 0 : w.percent
+
+/** The whole status line: the two windows, then the credits. */
+export const lineOf = (c: Credits | null, w: Windows, now: number, showWindows = true): string | undefined => {
+  const parts: string[] = []
+  if (showWindows) {
+    const five = percentNow(w.fiveHour, now)
+    const week = percentNow(w.weekly, now)
+    if (five !== undefined) parts.push(`5h ${Math.round(five)}%`)
+    if (week !== undefined) parts.push(`Weekly ${Math.round(week)}%`)
+  }
+  const credits = c ? statusText(c) : undefined
+  if (credits) parts.push(credits)
+  return parts.length > 0 ? parts.join(' · ') : undefined
+}
+
+const fmtUntil = (ms: number): string => {
+  const m = Math.max(0, Math.round(ms / 60_000))
+  const d = Math.floor(m / 1440)
+  const h = Math.floor((m % 1440) / 60)
+  return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m % 60}m` : `${m}m`
+}
+
+/** The windows with their resets, for /credits. */
+export const windowsSummary = (w: Windows, now: number): string => {
+  const one = (name: string, x: Win | undefined): string | null => {
+    const p = percentNow(x, now)
+    if (p === undefined) return null
+    const reset = x?.resetsAt && Date.parse(x.resetsAt) > now ? ` (resets in ${fmtUntil(Date.parse(x.resetsAt) - now)})` : ''
+    return `${name} ${Math.round(p)}%${reset}`
+  }
+  return [one('5-hour', w.fiveHour), one('weekly', w.weekly)].filter(Boolean).join(' · ')
+}
+
 /** The prepaid balance from the billing endpoint's answer, in minor units, or null. */
 export const parseBalance = (text: string): number | null => {
   try {
@@ -158,7 +247,21 @@ let isRefreshing = false
 // After a 429 the endpoint is left alone until this time.
 let backoffUntil = 0
 
-type RefreshOptions = { isForced: boolean; warnAt: number }
+type RefreshOptions = { isForced: boolean; warnAt: number; showWindows: boolean }
+
+/** Pins the status line from what is in hand: no request. */
+async function pin($: EngineInterface, showWindows: boolean): Promise<void> {
+  const c = await read($, credits)
+  const w = await read($, windows)
+  $.ui.status(lineOf(c, w, await $.clock.now(), showWindows))
+}
+
+/** Folds fresh window figures into the kept ones and saves them for the next session. */
+async function takeWindows($: EngineInterface, fresh: Windows): Promise<void> {
+  if (!fresh.fiveHour && !fresh.weekly) return
+  const next = await update($, windows, kept => mergeWindows(kept, fresh))
+  if (next) await $.store.set(STORE_WINDOWS, next)
+}
 
 /** One toast when usage first crosses the warn level, one more at 95; re-armed when it drops below. */
 async function warnIfCrossed($: EngineInterface, c: Credits, warnAt: number): Promise<void> {
@@ -219,6 +322,7 @@ async function refresh($: EngineInterface, opts: RefreshOptions): Promise<Credit
     if (now >= backoffUntil) {
       const res = await $.http.fetch(USAGE_URL, { auth: auth.handle, headers: HEADERS })
       if (res.ok) {
+        await takeWindows($, parseWindows(res.text, now))
         parsed = parseCredits(res.text, now)
         if (!parsed) error = 'no credit figures in the answer'
       } else if (res.status === 429) {
@@ -234,6 +338,7 @@ async function refresh($: EngineInterface, opts: RefreshOptions): Promise<Credit
 
     if (parsed === null && balance === null) {
       if (error !== null) await update($, view, v => ({ ...v, error: error ?? '' }))
+      await pin($, opts.showWindows)
       return prev
     }
     // Fresh figures where read, the last known ones where not.
@@ -244,7 +349,7 @@ async function refresh($: EngineInterface, opts: RefreshOptions): Promise<Credit
     await update($, view, v => ({ ...v, error: error ?? '' }))
     await $.store.set(STORE_LAST, next)
     await warnIfCrossed($, next, opts.warnAt)
-    $.ui.status(statusText(next))
+    await pin($, opts.showWindows)
     return next
   } catch (err) {
     await update($, view, v => ({ ...v, error: String(err).slice(0, 60) }))
@@ -266,25 +371,34 @@ export const register: Register = (on, options) => {
     return Number.isFinite(p) && p > 0 && p < 100 ? p : DEFAULT_WARN_AT
   }
   const showBand = () => options.showBand === true
+  const showWindows = () => options.showWindows !== false
+  const refreshOpts = (isForced: boolean): RefreshOptions => ({ isForced, warnAt: warnAt(), showWindows: showWindows() })
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     await $.command.register({
       name: 'credits',
-      description: 'Usage credits: /credits refreshes and shows the balance; /credits hide or show toggles the optional row above the prompt',
+      description: 'Usage: /credits refreshes and shows the 5-hour and weekly windows and the credit balance; /credits hide or show toggles the optional row above the prompt',
     })
     // Last session's reading shows at once; the fresh one replaces it.
     const last = (await $.store.get(STORE_LAST)) as Credits | undefined
-    if (last && typeof last.fetchedAt === 'number') {
-      await update($, credits, () => last)
-      $.ui.status(statusText(last))
+    if (last && typeof last.fetchedAt === 'number') await update($, credits, () => last)
+    const lastWindows = (await $.store.get(STORE_WINDOWS)) as Windows | undefined
+    if (lastWindows && typeof lastWindows === 'object') await update($, windows, () => lastWindows)
+    // The engine's own figures, when a reply has already reported them (a resumed session).
+    try {
+      const usage = await $.session.usage()
+      await takeWindows($, windowsOfRateLimits(usage.rateLimits, await $.clock.now()))
+    } catch {
+      // none yet
     }
+    await pin($, showWindows())
     // The first refresh runs right after the session is ready, off the start's own wait.
     $.clock.after(1, () => {
-      void refresh($, { isForced: true, warnAt: warnAt() })
+      void refresh($, refreshOpts(true))
     })
     $.clock.every(pollMs(), () => {
-      void refresh($, { isForced: true, warnAt: warnAt() })
+      void refresh($, refreshOpts(true))
     })
     return started
   })
@@ -294,22 +408,29 @@ export const register: Register = (on, options) => {
   // in hand: no request. Spend moves after a turn, so it is also re-read then (at most
   // every five minutes, and never inside a 429 backoff).
   on('turn.start', async ($, e, next) => {
-    if (!e.agentId) {
-      const c = await read($, credits)
-      if (c) $.ui.status(statusText(c))
-    }
+    if (!e.agentId) await pin($, showWindows())
     return next(e)
   })
 
   on('turn.complete', async ($, e, next) => {
     if (!e.agentId) {
-      const c = await read($, credits)
-      if (c) $.ui.status(statusText(c))
+      await pin($, showWindows())
       $.clock.after(1, () => {
-        void refresh($, { isForced: false, warnAt: warnAt() })
+        void refresh($, refreshOpts(false))
       })
     }
     return next(e)
+  })
+
+  // The engine's 5-hour and weekly figures after each reply, and whenever a window moves
+  // a whole point: free, no request.
+  on('session.measure', async ($, e, next) => {
+    const result = await next(e)
+    if (e.changed.includes('rateLimits')) {
+      await takeWindows($, windowsOfRateLimits(e.rateLimits, await $.clock.now()))
+      await pin($, showWindows())
+    }
+    return result
   })
 
   on('command.run', { command: 'credits' }, async ($, e) => {
@@ -318,11 +439,14 @@ export const register: Register = (on, options) => {
       await update($, view, v => ({ ...v, isHidden: arg === 'hide' }))
       return { text: arg === 'hide' ? 'Credits row hidden. /credits show brings it back.' : 'Credits row shown.' }
     }
-    const c = await refresh($, { isForced: true, warnAt: warnAt() })
+    const c = await refresh($, refreshOpts(true))
     const v = await read($, view)
-    if (!c) return { text: `Usage credits: no reading yet${v.error ? ` (${v.error})` : ''}.` }
     const now = await $.clock.now()
-    return { text: `Usage credits: ${summary(c)} · refreshed ${fmtAgo(now - c.fetchedAt)}${v.error ? ` · last refresh ${v.error}` : ''}` }
+    const plan = windowsSummary(await read($, windows), now)
+    const planLine = plan ? `Plan: ${plan}
+` : ''
+    if (!c) return { text: `${planLine}Usage credits: no reading yet${v.error ? ` (${v.error})` : ''}.` }
+    return { text: `${planLine}Usage credits: ${summary(c)} · refreshed ${fmtAgo(now - c.fetchedAt)}${v.error ? ` · last refresh ${v.error}` : ''}` }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {

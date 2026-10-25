@@ -27,7 +27,12 @@
     {
       "name": "usage-credits",
       "source": "./mods/usage-credits",
-      "description": "Usage credits (the pool Fable draws on) above the prompt: dollars left of the monthly limit and percent used, refreshed from your account, with a warning as it runs low."
+      "description": "The plan's 5-hour and weekly use and your usage credits (the pool Fable draws on) on the status line under the prompt, refreshed from the session and your account."
+    },
+    {
+      "name": "usage-quota",
+      "source": "./mods/usage-quota",
+      "description": "A compact context band above the prompt: context use with its breakdown, one-click Compact and per-session Auto compact. Fork of Anant Raghunath's usage-quota without the 5-hour and weekly meters (usage-credits shows those) and without polling."
     },
     {
       "name": "mod-template",
