@@ -138,6 +138,25 @@ describe('usage-credits', () => {
     expect(w.fetches).toBe(3)
   })
 
+  test('every turn re-pins the status line from the reading in hand, even inside a 429 backoff', async ($, on) => {
+    const clock = mock.clock(on, { now: 1_000_000 })
+    const w = world(on)
+    on('turn.start', ($, e) => ({ turnId: e.turnId }))
+    await $.session.start(session)
+    await clock.advance(1)
+    w.status = 429
+    await clock.advance(10 * 60_000)
+    const fetches = w.fetches
+    w.lines.length = 0
+    await $.turn.start({ text: 'go', turnId: 't1' })
+    expect(w.lines[w.lines.length - 1]).toBe('Credits $57.51 left of $100 · 42%')
+    await $.turn.complete({ answer: 'x', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+    await clock.advance(1)
+    expect(w.lines[w.lines.length - 1]).toBe('Credits $57.51 left of $100 · 42%')
+    // Inside the backoff: no request was made for it.
+    expect(w.fetches).toBe(fetches)
+  })
+
   test('a 429 backs off for at least fifteen minutes and keeps the last reading', async ($, on) => {
     const clock = mock.clock(on, { now: 1_000_000 })
     const w = world(on)

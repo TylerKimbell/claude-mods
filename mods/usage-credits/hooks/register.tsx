@@ -213,9 +213,22 @@ export const register: Register = (on, options) => {
     return started
   })
 
-  // Spend moves after a turn, so re-read then (at most once a minute).
+  // A status set while the session starts can land before the app attaches, so the
+  // line is pinned again at the first turn, and at every turn after, from the reading
+  // in hand: no request. Spend moves after a turn, so it is also re-read then (at most
+  // every five minutes, and never inside a 429 backoff).
+  on('turn.start', async ($, e, next) => {
+    if (!e.agentId) {
+      const c = await read($, credits)
+      if (c) $.ui.status(statusText(c))
+    }
+    return next(e)
+  })
+
   on('turn.complete', async ($, e, next) => {
     if (!e.agentId) {
+      const c = await read($, credits)
+      if (c) $.ui.status(statusText(c))
       $.clock.after(1, () => {
         void refresh($, { isForced: false, warnAt: warnAt() })
       })

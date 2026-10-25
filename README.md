@@ -42,6 +42,10 @@ Not in this repo, but part of the standard setup:
 
 Read a mod's source before installing it.
 
+### Install usage-quota last
+
+Mods load in the order they were installed, and the band above the prompt is drawn in that order: each mod draws its row and passes the rest down. usage-quota draws its block without passing the draw down, so every mod installed after it loses its band row (cache-clock's countdown, agent-progress's bars). Install usage-quota after everything else. If it is already installed, uninstall and reinstall it to move it to the end.
+
 ## Develop a mod
 
 Each mod folder holds three files:
