@@ -11,7 +11,7 @@ Every step is safe to run again on a machine that already has some of this insta
 | # | Plugin id | From | What it is |
 | --- | --- | --- | --- |
 | 1 | `filetree@claude-code-filetree` | data-goblin/claude-code-filetree | Live file tree pane |
-| 2 | `agent-progress@claude-mods` | this repo | Working row, subagent bar, Agents pane |
+| 2 | `agent-progress@claude-mods` | this repo | Subagent bar and Agents pane |
 | 3 | `cache-clock@claude-mods` | this repo | Cache countdown and context in the band (our fork) |
 | 4 | `cache-warmer@claude-mods` | this repo | Keeps big sessions' cache warm while idle |
 | 5 | `launch-codes@claude-mods` | this repo | Code-and-LAUNCH guard on risky commands and .env edits |
@@ -129,9 +129,8 @@ Restart the desktop app, or start a new session (in an open session, `/reload-pl
 
 And on screen, after sending any message:
 
-- The band above the prompt starts with cache-clock's `◷ cache 59:… left · ctx …` line, then usage-quota's block, then agent-progress's `Last turn · …` row.
+- The band above the prompt starts with cache-clock's `◷ cache 59:… left · ctx …` line, then usage-quota's block. agent-progress's subagent bar joins it whenever Claude runs subagents.
 - The status line under the prompt reads `usage-credits  Credits $… left of $… · …%`.
-- The spinner line while Claude works ends with `· N tool calls · <last tool>`.
 - A Files tab (filetree) sits beside the chat.
 
 The first time a new mod loads, the desktop app may ask whether to allow it. Allow it.

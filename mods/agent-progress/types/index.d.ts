@@ -39,21 +39,12 @@ export type Panel = {
   hasAutoOpened: boolean
 }
 
-/** The main thread's current turn: when it began, how many tools it has called, the last one. */
-export type Work = {
-  startedAt: number
-  endedAt?: number
-  tools: number
-  last: string
-}
-
 declare module 'claude-code' {
   interface PluginState {
     'agent-progress': {
       bar: Bar | null
       agents: AgentRun[]
       panel: Panel
-      work: Work | null
     }
   }
 }

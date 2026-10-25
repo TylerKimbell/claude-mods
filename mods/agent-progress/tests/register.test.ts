@@ -145,94 +145,24 @@ describe('agent-progress', () => {
     }
   })
 
-  test("the main thread's turn shows a working row, then a dim summary", async ($, on) => {
-    const clock = mock.clock(on, { now: 1_000_000 })
-    world(on)
-    on('turn.start', ($, e) => ({ turnId: e.turnId }))
-    on('tool.call', () => ({ result: 'ran' }))
-    await $.session.start({ ...session, surface: 'terminal' })
-    const ui = await $.ui.mount({ plugin: 'agent-progress', surface: 'terminal', component: 'AbovePrompt', props: band })
-    expect(await ui.find({ type: 'Text', text: /Working/ })).toBe(undefined)
-
-    await $.turn.start({ text: 'go', turnId: 't-main' })
-    expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toContain('0 tool calls')
-
-    await $.tool.call({ tool: 'Bash', command: 'npm test' })
-    await clock.advance(65_000)
-    // The clock redraws every 2 seconds, so the row reads 1:04 or 1:05.
-    const row = String((await ui.find({ type: 'Text', text: /Working/ }))?.text)
-    expect(row).toContain('· 1:0')
-    expect(row).toContain('1 tool call ·')
-    expect(row).toContain('Bash npm test')
-
-    await $.tool.call({ tool: 'Edit', file_path: 'C:\\app\\src\\index.ts', old_string: 'a', new_string: 'b' })
-    expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toContain('2 tool calls · Edit index.ts')
-
-    await $.turn.complete({ answer: 'done', durationMs: 65_000, isAborted: false, turnId: 't-main', reason: 'answer' } as AnsweredTurn)
-    expect(await ui.find({ type: 'Text', text: /Working/ })).toBe(undefined)
-    expect(String((await ui.find({ type: 'Text', text: /Last turn/ }))?.text)).toContain('1:05 · 2 tool calls')
-
-    // The next turn replaces the summary.
-    await $.turn.start({ text: 'again', turnId: 't-main-2' })
-    expect(await ui.find({ type: 'Text', text: /Last turn/ })).toBe(undefined)
-    expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toContain('0 tool calls')
-    await ui.unmount()
-  })
-
-  test('the working row draws on the desktop too, with and without a subagent bar', async ($, on) => {
-    mock.clock(on, { now: 1_000_000 })
-    world(on)
-    on('turn.start', ($, e) => ({ turnId: e.turnId }))
-    on('tool.call', () => ({ result: 'ran' }))
-    await $.session.start(session)
-    const ui = await $.ui.mount({ plugin: 'agent-progress', surface: 'desktop', component: 'AbovePrompt', props: band })
-    await $.turn.start({ text: 'go', turnId: 't-main' })
-    expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toContain('0 tool calls')
-    expect(await ui.find({ type: 'Text', text: /^other mod$/ })).toBeTruthy()
-    await $.agent.spawn(spawn('1'))
-    expect(await barAlt(ui)).toBe('Subagents: 0/1, 0%')
-    expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toContain('Working')
-    await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 't-main', reason: 'answer' } as AnsweredTurn)
-    expect(String((await ui.find({ type: 'Text', text: /Last turn/ }))?.text)).toContain('0 tool calls')
-    await ui.unmount()
-  })
-
-  test('the spinner line carries the tool count while the turn runs', async ($, on) => {
+  test("Claude's own turn draws nothing: the band stays empty and the spinner is the app's own", async ($, on) => {
     mock.clock(on, { now: 1_000_000 })
     on('session.start', ($, e) => ({ cwd: e.cwd }))
     on('tool.register', ($, e) => ({ value: { tool: e.name } }))
     on('command.register', ($, e) => ({ value: { command: e.name } }))
     on('turn.start', ($, e) => ({ turnId: e.turnId }))
-    on('turn.complete', ($, e) => ({ text: e.answer }))
     on('tool.call', () => ({ result: 'ran' }))
-    // The engine beneath draws the spinner from its props, as the surface would.
-    on('ui.render', ($, e) => $.ui.resolve(e).Text({ children: [`${(e.props as { word?: string }).word ?? ''}${(e.props as { suffix?: string }).suffix ?? ''}`] }))
+    // The engine beneath draws each site from its props, as the surface would.
+    on('ui.render', ($, e) => $.ui.resolve(e).Text({ children: [`${(e.props as { word?: string }).word ?? 'engine'}${(e.props as { suffix?: string }).suffix ?? ''}`] }))
     await $.session.start(session)
-    const spinner = { word: 'Working', message: null, suffix: '…', mode: 'thinking' } as RenderPropsOf['Spinner']
-    for (const surface of ['desktop', 'terminal'] as const) {
-      const ui = await $.ui.mount({ plugin: 'agent-progress', surface, component: 'Spinner', requestId: 'main', props: spinner })
-      // No turn: the spinner is the engine's own.
-      expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toBe('Working…')
-      await $.turn.start({ text: 'go', turnId: `t-${surface}` })
-      await $.tool.call({ tool: 'Bash', command: 'git status' })
-      expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toBe('Working… · 1 tool call · Bash git status')
-      await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: `t-${surface}`, reason: 'answer' } as AnsweredTurn)
-      expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toBe('Working…')
-      await ui.unmount()
-    }
-  })
-
-  test("a subagent's tool calls do not count toward the main thread's row", async ($, on) => {
-    mock.clock(on, { now: 1_000_000 })
-    world(on)
-    on('turn.start', ($, e) => ({ turnId: e.turnId }))
-    on('tool.call', () => ({ result: 'ran' }))
-    await $.session.start({ ...session, surface: 'terminal' })
-    const ui = await $.ui.mount({ plugin: 'agent-progress', surface: 'terminal', component: 'AbovePrompt', props: band })
     await $.turn.start({ text: 'go', turnId: 't-main' })
-    await $.agent.spawn(spawn('1'))
-    await $.tool.call({ tool: 'Bash', command: 'ls', agentId: 'agent-1' })
-    expect(String((await ui.find({ type: 'Text', text: /Working/ }))?.text)).toContain('0 tool calls')
+    await $.tool.call({ tool: 'Bash', command: 'git status' })
+    const spinner = await $.ui.mount({ plugin: 'agent-progress', surface: 'desktop', component: 'Spinner', requestId: 'main', props: { word: 'Working', message: null, suffix: '…', mode: 'thinking' } as RenderPropsOf['Spinner'] })
+    expect(String((await spinner.find({ type: 'Text', text: /Working/ }))?.text)).toBe('Working…')
+    await spinner.unmount()
+    const ui = await $.ui.mount({ plugin: 'agent-progress', surface: 'desktop', component: 'AbovePrompt', props: band })
+    expect(await ui.find({ type: 'Svg' })).toBe(undefined)
+    expect(await ui.find({ type: 'Text', text: /Working|tool call/ })).toBe(undefined)
     await ui.unmount()
   })
 
