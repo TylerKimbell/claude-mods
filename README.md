@@ -36,7 +36,7 @@ Requires Claude Code 2.1.287 or later. A private repo installs only for people w
 | [`cache-clock`](mods/cache-clock/README.md) | One line above the prompt: context used and a countdown until the prompt cache goes cold. A fork of Ray Amjad's cache-clock that also restarts the clock on cache-warmer's pings, with the handoff note off by default. |
 | [`cache-warmer`](mods/cache-warmer/README.md) | Keeps a big session's prompt cache warm while you are away: a cheap tool-less request over the cached transcript a few minutes before expiry, once per cache lifetime, capped at 4 idle hours and skipped under 100k tokens. `/warmer` shows pings, cost and what a cold return would have cost. |
 | [`launch-codes`](mods/launch-codes/README.md) | Risky Bash and PowerShell commands (rm -rf, force push, reset --hard, DROP TABLE, curl piped into sh, disk formats) and `.env` edits need a 4-character code typed by you, then a LAUNCH. `/launch-codes test <command>` checks a command. |
-| [`usage-credits`](mods/usage-credits/README.md) | Usage credits, the pool Fable draws on, in the status line under the prompt: `Credits $57.51 left of $100 · 42%`, refreshed from your account every few minutes, with a toast as it runs low. `/credits` prints it; an option adds a band row too. |
+| [`usage-credits`](mods/usage-credits/README.md) | Usage credits, the pool Fable draws on, in the status line under the prompt: `Credits $91.49 left · month $93.84 of $100 limit`, the purchased balance plus this month's spend against the monthly limit, refreshed from your account, with a toast as the limit nears. `/credits` prints it; an option adds a band row too. |
 | `mod-template` | Starter folder to copy for a new mod. |
 
 ## Mods we install from elsewhere

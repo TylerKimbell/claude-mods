@@ -7,6 +7,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Credits, View } from '../types'
 
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
+const PROFILE_URL = 'https://api.anthropic.com/api/oauth/profile'
 const STORE_LAST = 'last'
 const STORE_WARNED = 'warnedAt'
 const MIN_REFRESH_MS = 5 * 60_000
@@ -93,12 +94,39 @@ export const fmtMoney = (minor: number, exponent: number, currency: string): str
 
 export const leftOf = (c: Credits): number => Math.max(0, c.limitMinor - c.usedMinor)
 
+const money = (c: Credits, minor: number): string => fmtMoney(minor, c.exponent, c.currency)
+
 /** The status line under the prompt: short, since it shares the row with the engine's own notices. */
 export const statusText = (c: Credits): string =>
-  `Credits ${fmtMoney(leftOf(c), c.exponent, c.currency)} left of ${fmtMoney(c.limitMinor, c.exponent, c.currency)} · ${Math.round(c.percent)}%${c.isLimitReached ? ' · limit reached' : ''}`
+  c.balanceMinor !== undefined
+    ? `Credits ${money(c, c.balanceMinor)} left · month ${money(c, c.usedMinor)} of ${money(c, c.limitMinor)} limit${c.isLimitReached ? ' · limit reached' : ''}`
+    : `Credits ${money(c, leftOf(c))} left of ${money(c, c.limitMinor)} · ${Math.round(c.percent)}%${c.isLimitReached ? ' · limit reached' : ''}`
 
 export const summary = (c: Credits): string =>
-  `${fmtMoney(leftOf(c), c.exponent, c.currency)} left of ${fmtMoney(c.limitMinor, c.exponent, c.currency)} · ${Math.round(c.percent)}% used`
+  c.balanceMinor !== undefined
+    ? `${money(c, c.balanceMinor)} left · this month ${money(c, c.usedMinor)} of ${money(c, c.limitMinor)} monthly limit (${Math.round(c.percent)}%)`
+    : `${money(c, leftOf(c))} left of ${money(c, c.limitMinor)} · ${Math.round(c.percent)}% used`
+
+/** The prepaid balance from the billing endpoint's answer, in minor units, or null. */
+export const parseBalance = (text: string): number | null => {
+  try {
+    const body = JSON.parse(text) as { amount?: unknown }
+    return typeof body.amount === 'number' ? body.amount : null
+  } catch {
+    return null
+  }
+}
+
+/** The organization's id from the profile endpoint's answer, or null. */
+export const parseOrgId = (text: string): string | null => {
+  try {
+    const body = JSON.parse(text) as { organization?: { uuid?: unknown } | null }
+    const id = body.organization?.uuid
+    return typeof id === 'string' && /^[A-Za-z0-9-]+$/.test(id) ? id : null
+  } catch {
+    return null
+  }
+}
 
 const colorOf = (c: Credits, warnAt: number): string => (c.isLimitReached || c.percent >= 95 ? RED : c.percent >= warnAt ? AMBER : GREEN)
 
@@ -126,7 +154,28 @@ async function warnIfCrossed($: EngineInterface, c: Credits, warnAt: number): Pr
   await $.store.set(STORE_WARNED, level)
   if (level === 0) return
   const left = fmtMoney(leftOf(c), c.exponent, c.currency)
-  $.ui.toast(level >= 95 ? `Usage credits nearly gone: ${left} left (${Math.round(c.percent)}% used)` : `Usage credits at ${Math.round(c.percent)}%: ${left} left`)
+  $.ui.toast(
+    level >= 95
+      ? `Monthly credit limit nearly reached: ${left} left this month (${Math.round(c.percent)}% used)`
+      : `Monthly credit limit at ${Math.round(c.percent)}%: ${left} left this month`,
+  )
+}
+
+const HEADERS = { 'anthropic-beta': 'oauth-2025-04-20', 'content-type': 'application/json' }
+
+// The organization's id, looked up once per load: the prepaid balance is filed under it.
+let orgId: string | null = null
+
+/** The prepaid credit balance in minor units, or null when it cannot be read. */
+async function fetchBalance($: EngineInterface, handle: string): Promise<number | null> {
+  if (!orgId) {
+    const profile = await $.http.fetch(PROFILE_URL, { auth: handle, headers: HEADERS })
+    if (!profile.ok) return null
+    orgId = parseOrgId(profile.text)
+    if (!orgId) return null
+  }
+  const res = await $.http.fetch(`https://api.anthropic.com/api/oauth/organizations/${orgId}/prepaid/credits`, { auth: handle, headers: HEADERS })
+  return res.ok ? parseBalance(res.text) : null
 }
 
 /** Fetches the balance; keeps the last reading and says why on failure. */
@@ -143,10 +192,7 @@ async function refresh($: EngineInterface, opts: RefreshOptions): Promise<Credit
       await update($, view, v => ({ ...v, error: 'no Claude login' }))
       return prev
     }
-    const res = await $.http.fetch(USAGE_URL, {
-      auth: auth.handle,
-      headers: { 'anthropic-beta': 'oauth-2025-04-20', 'content-type': 'application/json' },
-    })
+    const res = await $.http.fetch(USAGE_URL, { auth: auth.handle, headers: HEADERS })
     if (!res.ok) {
       if (res.status === 429) {
         // Honour Retry-After, else stay away a good while: another mod polls this endpoint too.
@@ -159,11 +205,15 @@ async function refresh($: EngineInterface, opts: RefreshOptions): Promise<Credit
       await update($, view, v => ({ ...v, error: `failed (${res.status})` }))
       return prev
     }
-    const next = parseCredits(res.text, now)
-    if (!next) {
+    const parsed = parseCredits(res.text, now)
+    if (!parsed) {
       await update($, view, v => ({ ...v, error: 'no credit figures in the answer' }))
       return prev
     }
+    // The balance is a second request; when it fails, the last known balance stands.
+    const balance = await fetchBalance($, auth.handle).catch(() => null)
+    const known = balance ?? prev?.balanceMinor
+    const next: Credits = known === undefined ? parsed : { ...parsed, balanceMinor: known }
     await update($, credits, () => next)
     await update($, view, v => (v.error ? { ...v, error: '' } : v))
     await $.store.set(STORE_LAST, next)

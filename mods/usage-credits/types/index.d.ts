@@ -11,6 +11,8 @@ export type Credits = {
   percent: number
   isEnabled: boolean
   isLimitReached: boolean
+  /** The prepaid credit balance, in minor units, as the account's billing page shows it; absent when it could not be read. */
+  balanceMinor?: number
   /** When this reading was fetched, in `$.clock.now()` milliseconds. */
   fetchedAt: number
 }

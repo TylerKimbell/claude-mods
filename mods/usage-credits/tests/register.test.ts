@@ -1,7 +1,7 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 import type { On, RenderPropsOf } from 'claude-code'
 
-import { fmtMoney, parseCredits, summary } from '../hooks/register'
+import { fmtMoney, parseBalance, parseCredits, parseOrgId, statusText, summary } from '../hooks/register'
 
 const band: RenderPropsOf['AbovePrompt'] = { hasSurvey: false, isWorking: false, maxRows: 12, bodyColumns: 120, scroll: { offset: 0, bodyRows: 12 }, view: {} }
 const session = { cwd: '/', surface: 'desktop', isInteractive: true } as const
@@ -23,14 +23,38 @@ const answer = (used: number, limit = 10000) =>
     spend: { used: { amount_minor: used, currency: 'USD', exponent: 2 }, limit: { amount_minor: limit, currency: 'USD', exponent: 2 }, percent: Math.round((used / limit) * 100), enabled: true },
   })
 
-type World = { fetches: number; toasts: string[]; store: Map<string, unknown>; used: number; status: number; lines: string[] }
+type World = {
+  /** Requests to the usage endpoint. */
+  fetches: number
+  profiles: number
+  balances: number
+  toasts: string[]
+  store: Map<string, unknown>
+  used: number
+  status: number
+  /** The prepaid balance in cents; null answers the billing endpoint with a 404. */
+  balance: number | null
+  lines: string[]
+}
 
 function world(on: On, used = 4249): World {
-  const w: World = { fetches: 0, toasts: [], store: new Map(), used, status: 200, lines: [] }
+  const w: World = { fetches: 0, profiles: 0, balances: 0, toasts: [], store: new Map(), used, status: 200, balance: null, lines: [] }
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('session.authorize', () => ({ value: { handle: 'h', kind: 'bearer' as const } }))
-  on('http.fetch', () => {
+  on('http.fetch', ($, e) => {
+    const url = (e as unknown as { url: string }).url
+    if (url.endsWith('/api/oauth/profile')) {
+      w.profiles += 1
+      return { value: { status: 200, ok: true, headers: {}, text: JSON.stringify({ account: { uuid: 'acc-1' }, organization: { uuid: 'org-1', name: 'Org' } }) } }
+    }
+    if (url.includes('/prepaid/credits')) {
+      w.balances += 1
+      expect(url).toBe('https://api.anthropic.com/api/oauth/organizations/org-1/prepaid/credits')
+      return w.balance === null
+        ? { value: { status: 404, ok: false, headers: {}, text: 'not found' } }
+        : { value: { status: 200, ok: true, headers: {}, text: JSON.stringify({ amount: w.balance, currency: 'USD', auto_reload_settings: null, expiry_policy_months: null }) } }
+    }
     w.fetches += 1
     return { value: { status: w.status, ok: w.status === 200, headers: {}, text: w.status === 200 ? answer(w.used) : 'nope' } }
   })
@@ -67,6 +91,21 @@ describe('parsing', () => {
     expect(parseCredits(only, 1)?.limitMinor).toBe(5000)
     expect(parseCredits('{"five_hour":{}}', 1)).toBe(null)
     expect(parseCredits('not json', 1)).toBe(null)
+  })
+
+  test('reads the prepaid balance and the organization id', async () => {
+    expect(parseBalance(JSON.stringify({ amount: 9149, currency: 'USD' }))).toBe(9149)
+    expect(parseBalance(JSON.stringify({ currency: 'USD' }))).toBe(null)
+    expect(parseBalance('nope')).toBe(null)
+    expect(parseOrgId(JSON.stringify({ organization: { uuid: 'a1b2-c3' } }))).toBe('a1b2-c3')
+    expect(parseOrgId(JSON.stringify({ organization: { uuid: '../x' } }))).toBe(null)
+    expect(parseOrgId(JSON.stringify({ organization: null }))).toBe(null)
+  })
+
+  test('with a balance, the line leads with it and keeps the monthly limit beside it', async () => {
+    const c = { ...parseCredits(answer(9384), 1)!, balanceMinor: 9149 }
+    expect(statusText(c)).toBe('Credits $91.49 left · month $93.84 of $100 limit')
+    expect(summary(c)).toBe('$91.49 left · this month $93.84 of $100 monthly limit (94%)')
   })
 
   test('money formatting', async () => {
@@ -138,6 +177,24 @@ describe('usage-credits', () => {
     expect(w.fetches).toBe(3)
   })
 
+  test('the purchased balance leads the status line; the profile is asked once; a failed balance read keeps the last one', async ($, on) => {
+    const clock = mock.clock(on, { now: 1_000_000 })
+    const w = world(on, 9384)
+    w.balance = 9149
+    await $.session.start(session)
+    await clock.advance(1)
+    expect(w.lines[w.lines.length - 1]).toBe('Credits $91.49 left · month $93.84 of $100 limit')
+    const out = await $.command.run({ command: 'credits', args: '' })
+    expect(String(out.text)).toContain('$91.49 left · this month $93.84 of $100 monthly limit (94%)')
+    expect(w.profiles).toBe(1)
+    expect(w.balances).toBe(2)
+    // The billing endpoint fails: the last balance stands rather than flipping the line back.
+    w.balance = null
+    await clock.advance(10 * 60_000)
+    expect(w.lines[w.lines.length - 1]).toBe('Credits $91.49 left · month $93.84 of $100 limit')
+    expect(w.profiles).toBe(1)
+  })
+
   test('every turn re-pins the status line from the reading in hand, even inside a 429 backoff', async ($, on) => {
     const clock = mock.clock(on, { now: 1_000_000 })
     const w = world(on)
@@ -185,7 +242,7 @@ describe('usage-credits', () => {
     w.used = 9700
     await clock.advance(10 * 60_000)
     expect(w.toasts.length).toBe(2)
-    expect(w.toasts[1]).toContain('nearly gone')
+    expect(w.toasts[1]).toContain('nearly reached')
   })
 
   test('a failed refresh keeps the last reading and says why', { options: { showBand: true } }, async ($, on) => {
