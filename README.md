@@ -2,6 +2,14 @@
 
 Claude Code mods we build and share. One repository, one marketplace, one folder per mod under `mods/`.
 
+## Same setup on a new machine
+
+Clone this repo, open Claude Code in the folder, and say:
+
+> Follow SETUP.md to install all the mods on this machine.
+
+[SETUP.md](SETUP.md) installs every mod below plus filetree and usage-quota, in the order the band needs, and checks the result.
+
 ## Install a mod
 
 At the prompt of a terminal `claude` session:
