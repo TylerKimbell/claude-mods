@@ -1,14 +1,14 @@
 /** The account's usage credits, as the usage endpoint's `extra_usage` block reports them. */
 export type Credits = {
-  /** Used so far this month, in minor units (cents for USD). */
-  usedMinor: number
-  /** The monthly limit, in minor units. */
-  limitMinor: number
+  /** Spent so far this month, in minor units (cents for USD); absent when not reported. */
+  usedMinor?: number
+  /** The monthly spend limit, in minor units; absent when the limit is unlimited. */
+  limitMinor?: number
   /** Minor units per major unit, as a power of ten: 2 for cents. */
   exponent: number
   currency: string
-  /** 0 to 100. */
-  percent: number
+  /** Percent of the monthly limit spent, 0 to 100; absent with no limit. */
+  percent?: number
   isEnabled: boolean
   isLimitReached: boolean
   /** The prepaid credit balance, in minor units, as the account's billing page shows it; absent when it could not be read. */

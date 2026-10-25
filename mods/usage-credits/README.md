@@ -1,19 +1,16 @@
 # usage-credits
 
-Your usage credits in the status line under the prompt: the credit balance you have bought, and this month's spend against your monthly limit. These are the credits Fable 5.1 and anything past your plan limits draw on, separate from the 5-hour and weekly plan windows that usage-quota tracks.
+Your usage credits in the status line under the prompt: the dollars you have left. These are the credits Fable 5.1 and anything past your plan limits draw on, separate from the 5-hour and weekly plan windows that usage-quota tracks.
 
 ```
-usage-credits  Credits $91.49 left · month $93.84 of $100 limit
+usage-credits  Credits $91.49 left
 ```
 
-The two numbers are different limits, and either can stop credit use:
+That is your purchased balance, as the billing page's Usage credits section shows it. The line adds a flag only when something stops credits being spent: `· monthly limit reached` if you have a monthly spend limit and hit it, `· credits off` if usage credits are switched off.
 
-- **Balance** ($91.49 left): what you have bought and not spent, as the billing page's Usage credits section shows it.
-- **Monthly limit** ($93.84 of $100): the most credits that may be spent in a calendar month. Once it is reached, credits stop being spent until next month, whatever the balance. The toasts at 80% and 95% are about this limit.
+`/credits` prints the longer form, with this month's spend: `$91.49 left · no monthly limit, $93.84 spent this month`, or `· this month $93.84 of $100 monthly limit (94%)` when a limit is set. The 80% and 95% toasts only fire when a monthly limit is set.
 
-If the balance cannot be read, the line falls back to the monthly limit alone: `Credits $6.16 left of $100 · 94%`.
-
-With the `showBand` option on, a row is drawn above the prompt as well: `◆ Credits $57.51 left of $100 · 42% used`, green under the warn level, amber above it, red from 95% or once the limit is reached, with a dim note when the last refresh failed or the reading is stale. It is off by default because the band is shared and usage-quota hides every mod seated beneath it there.
+If the balance cannot be read, the line falls back to what a monthly limit still allows: `Credits $6.16 left of $100 · 94%`. The balance and the monthly-limit figures are read separately, so a refusal from one endpoint does not hold back the other.
 
 ## Where the numbers come from
 

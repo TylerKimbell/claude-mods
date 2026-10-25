@@ -52,31 +52,31 @@ export const parseCredits = (text: string, at: number): Credits | null => {
   }
   const x = body.extra_usage
   const s = body.spend
-  if (x && typeof x.monthly_limit === 'number' && typeof x.used_credits === 'number') {
-    const limit = x.monthly_limit
-    const used = x.used_credits
+  // An unlimited monthly limit comes back as null: the limit fields are then left out.
+  if (x && typeof x === 'object') {
+    const limit = typeof x.monthly_limit === 'number' && x.monthly_limit > 0 ? x.monthly_limit : undefined
+    const used = typeof x.used_credits === 'number' ? x.used_credits : undefined
     return {
-      usedMinor: used,
-      limitMinor: limit,
+      ...(used !== undefined ? { usedMinor: used } : {}),
+      ...(limit !== undefined ? { limitMinor: limit, percent: typeof x.utilization === 'number' ? x.utilization : ((used ?? 0) / limit) * 100 } : {}),
       exponent: typeof x.decimal_places === 'number' ? x.decimal_places : 2,
       currency: x.currency || 'USD',
-      percent: typeof x.utilization === 'number' ? x.utilization : limit > 0 ? (used / limit) * 100 : 0,
       isEnabled: x.is_enabled !== false,
-      isLimitReached: x.spend_limit_reached === true,
+      isLimitReached: limit !== undefined && x.spend_limit_reached === true,
       fetchedAt: at,
     }
   }
-  if (s && s.used && s.limit && typeof s.used.amount_minor === 'number' && typeof s.limit.amount_minor === 'number') {
-    const limit = s.limit.amount_minor
-    const used = s.used.amount_minor
+  if (s && typeof s === 'object') {
+    const limit = s.limit && typeof s.limit.amount_minor === 'number' && s.limit.amount_minor > 0 ? s.limit.amount_minor : undefined
+    const used = s.used && typeof s.used.amount_minor === 'number' ? s.used.amount_minor : undefined
+    if (limit === undefined && used === undefined) return null
     return {
-      usedMinor: used,
-      limitMinor: limit,
-      exponent: s.limit.exponent ?? 2,
-      currency: s.limit.currency || 'USD',
-      percent: typeof s.percent === 'number' ? s.percent : limit > 0 ? (used / limit) * 100 : 0,
+      ...(used !== undefined ? { usedMinor: used } : {}),
+      ...(limit !== undefined ? { limitMinor: limit, percent: typeof s.percent === 'number' ? s.percent : ((used ?? 0) / limit) * 100 } : {}),
+      exponent: s.limit?.exponent ?? s.used?.exponent ?? 2,
+      currency: s.limit?.currency || s.used?.currency || 'USD',
       isEnabled: s.enabled !== false,
-      isLimitReached: used >= limit && limit > 0,
+      isLimitReached: limit !== undefined && (used ?? 0) >= limit,
       fetchedAt: at,
     }
   }
@@ -92,20 +92,31 @@ export const fmtMoney = (minor: number, exponent: number, currency: string): str
   return `${sym}${isWhole ? Math.round(major).toString() : major.toFixed(exponent)}`
 }
 
-export const leftOf = (c: Credits): number => Math.max(0, c.limitMinor - c.usedMinor)
+/** What the monthly limit still allows this month, in minor units; 0 with no limit. */
+export const leftOf = (c: Credits): number => (c.limitMinor === undefined ? 0 : Math.max(0, c.limitMinor - (c.usedMinor ?? 0)))
 
 const money = (c: Credits, minor: number): string => fmtMoney(minor, c.exponent, c.currency)
 
-/** The status line under the prompt: short, since it shares the row with the engine's own notices. */
-export const statusText = (c: Credits): string =>
-  c.balanceMinor !== undefined
-    ? `Credits ${money(c, c.balanceMinor)} left · month ${money(c, c.usedMinor)} of ${money(c, c.limitMinor)} limit${c.isLimitReached ? ' · limit reached' : ''}`
-    : `Credits ${money(c, leftOf(c))} left of ${money(c, c.limitMinor)} · ${Math.round(c.percent)}%${c.isLimitReached ? ' · limit reached' : ''}`
+const pct = (c: Credits): string => `${Math.round(c.percent ?? 0)}%`
 
-export const summary = (c: Credits): string =>
-  c.balanceMinor !== undefined
-    ? `${money(c, c.balanceMinor)} left · this month ${money(c, c.usedMinor)} of ${money(c, c.limitMinor)} monthly limit (${Math.round(c.percent)}%)`
-    : `${money(c, leftOf(c))} left of ${money(c, c.limitMinor)} · ${Math.round(c.percent)}% used`
+/** The status line under the prompt: the dollars left, and a flag only when something stops spending. */
+export const statusText = (c: Credits): string | undefined => {
+  const flags = `${c.isLimitReached ? ' · monthly limit reached' : ''}${c.isEnabled ? '' : ' · credits off'}`
+  if (c.balanceMinor !== undefined) return `Credits ${money(c, c.balanceMinor)} left${flags}`
+  if (c.limitMinor !== undefined) return `Credits ${money(c, leftOf(c))} left of ${money(c, c.limitMinor)} · ${pct(c)}${flags}`
+  return undefined
+}
+
+/** The longer line for /credits and the optional band row. */
+export const summary = (c: Credits): string => {
+  const month =
+    c.limitMinor !== undefined
+      ? `this month ${money(c, c.usedMinor ?? 0)} of ${money(c, c.limitMinor)} monthly limit (${pct(c)})`
+      : `no monthly limit${c.usedMinor !== undefined ? `, ${money(c, c.usedMinor)} spent this month` : ''}`
+  if (c.balanceMinor !== undefined) return `${money(c, c.balanceMinor)} left · ${month}`
+  if (c.limitMinor !== undefined) return `${money(c, leftOf(c))} left of ${money(c, c.limitMinor)} · ${pct(c)} used`
+  return `balance not available · ${month}`
+}
 
 /** The prepaid balance from the billing endpoint's answer, in minor units, or null. */
 export const parseBalance = (text: string): number | null => {
@@ -128,7 +139,10 @@ export const parseOrgId = (text: string): string | null => {
   }
 }
 
-const colorOf = (c: Credits, warnAt: number): string => (c.isLimitReached || c.percent >= 95 ? RED : c.percent >= warnAt ? AMBER : GREEN)
+const colorOf = (c: Credits, warnAt: number): string => {
+  const p = c.percent ?? 0
+  return c.isLimitReached || !c.isEnabled || p >= 95 ? RED : p >= warnAt ? AMBER : GREEN
+}
 
 const fmtAgo = (ms: number): string => {
   const m = Math.round(ms / 60_000)
@@ -148,7 +162,9 @@ type RefreshOptions = { isForced: boolean; warnAt: number }
 
 /** One toast when usage first crosses the warn level, one more at 95; re-armed when it drops below. */
 async function warnIfCrossed($: EngineInterface, c: Credits, warnAt: number): Promise<void> {
-  const level = c.isLimitReached || c.percent >= 95 ? 95 : c.percent >= warnAt ? warnAt : 0
+  // No monthly limit, nothing to warn about: the level re-arms at 0.
+  const p = c.percent ?? 0
+  const level = c.limitMinor === undefined ? 0 : c.isLimitReached || p >= 95 ? 95 : p >= warnAt ? warnAt : 0
   const warned = Number((await $.store.get(STORE_WARNED)) ?? 0)
   if (level === warned) return
   await $.store.set(STORE_WARNED, level)
@@ -156,8 +172,8 @@ async function warnIfCrossed($: EngineInterface, c: Credits, warnAt: number): Pr
   const left = fmtMoney(leftOf(c), c.exponent, c.currency)
   $.ui.toast(
     level >= 95
-      ? `Monthly credit limit nearly reached: ${left} left this month (${Math.round(c.percent)}% used)`
-      : `Monthly credit limit at ${Math.round(c.percent)}%: ${left} left this month`,
+      ? `Monthly credit limit nearly reached: ${left} left this month (${pct(c)} used)`
+      : `Monthly credit limit at ${pct(c)}: ${left} left this month`,
   )
 }
 
@@ -178,13 +194,15 @@ async function fetchBalance($: EngineInterface, handle: string): Promise<number 
   return res.ok ? parseBalance(res.text) : null
 }
 
-/** Fetches the balance; keeps the last reading and says why on failure. */
+/**
+ * Reads the balance and the monthly-limit figures, each on its own: a 429 or an error on
+ * the usage endpoint does not hold back the balance. What fails keeps its last value.
+ */
 async function refresh($: EngineInterface, opts: RefreshOptions): Promise<Credits | null> {
   if (isRefreshing) return read($, credits)
   const now = await $.clock.now()
   const prev = await read($, credits)
   if (!opts.isForced && prev && now - prev.fetchedAt < MIN_REFRESH_MS) return prev
-  if (now < backoffUntil) return prev
   isRefreshing = true
   try {
     const auth = await $.session.authorize()
@@ -192,30 +210,38 @@ async function refresh($: EngineInterface, opts: RefreshOptions): Promise<Credit
       await update($, view, v => ({ ...v, error: 'no Claude login' }))
       return prev
     }
-    const res = await $.http.fetch(USAGE_URL, { auth: auth.handle, headers: HEADERS })
-    if (!res.ok) {
-      if (res.status === 429) {
+
+    const balance = await fetchBalance($, auth.handle).catch(() => null)
+
+    // The monthly-limit figures, unless the usage endpoint asked us to stay away.
+    let parsed: Credits | null = null
+    let error: string | null = null
+    if (now >= backoffUntil) {
+      const res = await $.http.fetch(USAGE_URL, { auth: auth.handle, headers: HEADERS })
+      if (res.ok) {
+        parsed = parseCredits(res.text, now)
+        if (!parsed) error = 'no credit figures in the answer'
+      } else if (res.status === 429) {
         // Honour Retry-After, else stay away a good while: another mod polls this endpoint too.
         const header = Object.entries(res.headers ?? {}).find(([k]) => k.toLowerCase() === 'retry-after')?.[1]
         const seconds = Number(header)
         backoffUntil = now + Math.max(BACKOFF_MS, Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 0)
-        await update($, view, v => ({ ...v, error: `refused (429), retrying in ${Math.round((backoffUntil - now) / 60_000)}m` }))
-        return prev
+        error = `refused (429), retrying in ${Math.round((backoffUntil - now) / 60_000)}m`
+      } else {
+        error = `failed (${res.status})`
       }
-      await update($, view, v => ({ ...v, error: `failed (${res.status})` }))
+    }
+
+    if (parsed === null && balance === null) {
+      if (error !== null) await update($, view, v => ({ ...v, error: error ?? '' }))
       return prev
     }
-    const parsed = parseCredits(res.text, now)
-    if (!parsed) {
-      await update($, view, v => ({ ...v, error: 'no credit figures in the answer' }))
-      return prev
-    }
-    // The balance is a second request; when it fails, the last known balance stands.
-    const balance = await fetchBalance($, auth.handle).catch(() => null)
+    // Fresh figures where read, the last known ones where not.
+    const base: Credits = parsed ?? prev ?? { exponent: 2, currency: 'USD', isEnabled: true, isLimitReached: false, fetchedAt: now }
     const known = balance ?? prev?.balanceMinor
-    const next: Credits = known === undefined ? parsed : { ...parsed, balanceMinor: known }
+    const next: Credits = { ...base, fetchedAt: now, ...(known !== undefined ? { balanceMinor: known } : {}) }
     await update($, credits, () => next)
-    await update($, view, v => (v.error ? { ...v, error: '' } : v))
+    await update($, view, v => ({ ...v, error: error ?? '' }))
     await $.store.set(STORE_LAST, next)
     await warnIfCrossed($, next, opts.warnAt)
     $.ui.status(statusText(next))
@@ -249,7 +275,7 @@ export const register: Register = (on, options) => {
     })
     // Last session's reading shows at once; the fresh one replaces it.
     const last = (await $.store.get(STORE_LAST)) as Credits | undefined
-    if (last && typeof last.limitMinor === 'number') {
+    if (last && typeof last.fetchedAt === 'number') {
       await update($, credits, () => last)
       $.ui.status(statusText(last))
     }

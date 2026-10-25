@@ -104,8 +104,24 @@ describe('parsing', () => {
 
   test('with a balance, the line leads with it and keeps the monthly limit beside it', async () => {
     const c = { ...parseCredits(answer(9384), 1)!, balanceMinor: 9149 }
-    expect(statusText(c)).toBe('Credits $91.49 left · month $93.84 of $100 limit')
+    expect(statusText(c)).toBe('Credits $91.49 left')
     expect(summary(c)).toBe('$91.49 left · this month $93.84 of $100 monthly limit (94%)')
+  })
+
+  test('an unlimited monthly limit comes back as null and the line is the balance alone', async () => {
+    const unlimited = JSON.stringify({
+      extra_usage: { is_enabled: true, monthly_limit: null, used_credits: 9384, utilization: null, currency: 'USD', decimal_places: 2, spend_limit_reached: false },
+      spend: { used: { amount_minor: 9384, currency: 'USD', exponent: 2 }, limit: null, percent: null, enabled: true },
+    })
+    const parsed = parseCredits(unlimited, 1)!
+    expect(parsed.limitMinor).toBe(undefined)
+    expect(parsed.usedMinor).toBe(9384)
+    expect(parsed.isLimitReached).toBe(false)
+    const c = { ...parsed, balanceMinor: 9149 }
+    expect(statusText(c)).toBe('Credits $91.49 left')
+    expect(summary(c)).toBe('$91.49 left · no monthly limit, $93.84 spent this month')
+    // With neither a balance nor a limit, the status line is cleared rather than guessed.
+    expect(statusText(parsed)).toBe(undefined)
   })
 
   test('money formatting', async () => {
@@ -183,7 +199,7 @@ describe('usage-credits', () => {
     w.balance = 9149
     await $.session.start(session)
     await clock.advance(1)
-    expect(w.lines[w.lines.length - 1]).toBe('Credits $91.49 left · month $93.84 of $100 limit')
+    expect(w.lines[w.lines.length - 1]).toBe('Credits $91.49 left')
     const out = await $.command.run({ command: 'credits', args: '' })
     expect(String(out.text)).toContain('$91.49 left · this month $93.84 of $100 monthly limit (94%)')
     expect(w.profiles).toBe(1)
@@ -191,8 +207,25 @@ describe('usage-credits', () => {
     // The billing endpoint fails: the last balance stands rather than flipping the line back.
     w.balance = null
     await clock.advance(10 * 60_000)
-    expect(w.lines[w.lines.length - 1]).toBe('Credits $91.49 left · month $93.84 of $100 limit')
+    expect(w.lines[w.lines.length - 1]).toBe('Credits $91.49 left')
     expect(w.profiles).toBe(1)
+  })
+
+  test('the balance still refreshes while the usage endpoint is backing off', async ($, on) => {
+    const clock = mock.clock(on, { now: 1_000_000 })
+    const w = world(on, 9900)
+    w.balance = 9149
+    await $.session.start(session)
+    await clock.advance(1)
+    expect(w.lines[w.lines.length - 1]).toBe('Credits $91.49 left')
+    // The usage endpoint refuses; the balance moves on its own.
+    w.status = 429
+    w.balance = 8000
+    await clock.advance(10 * 60_000)
+    expect(w.lines[w.lines.length - 1]).toBe('Credits $80 left')
+    w.balance = 7500
+    await clock.advance(10 * 60_000)
+    expect(w.lines[w.lines.length - 1]).toBe('Credits $75 left')
   })
 
   test('every turn re-pins the status line from the reading in hand, even inside a 429 backoff', async ($, on) => {
