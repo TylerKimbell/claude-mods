@@ -10,3 +10,7 @@ mods/agent-progress
 mods/launch-codes
   Based on launch-codes, Copyright (c) 2026 Claude Code Mods contributors (OneWave AI)
   https://github.com/OneWave-AI/claude-code-mods/tree/main/launch-codes
+
+mods/cache-clock
+  Fork of cache-clock 0.5.4, Copyright (c) 2026 Ray Amjad
+  https://github.com/ray-amjad/claude-code-mods/tree/main/plugins/cache-clock

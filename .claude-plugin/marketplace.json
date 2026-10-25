@@ -1,11 +1,18 @@
 {
   "name": "claude-mods",
-  "owner": { "name": "TylerKimbell" },
+  "owner": {
+    "name": "TylerKimbell"
+  },
   "plugins": [
     {
       "name": "agent-progress",
       "source": "./mods/agent-progress",
       "description": "A progress bar above the prompt for the subagents Claude starts, and an Agents pane with each one's model, step progress, context, estimated cost and time."
+    },
+    {
+      "name": "cache-clock",
+      "source": "./mods/cache-clock",
+      "description": "A one-line band above the prompt: context used and a countdown until the prompt cache goes cold. Fork of Ray Amjad's cache-clock that also restarts on cache-warmer's pings; handoff off by default."
     },
     {
       "name": "cache-warmer",

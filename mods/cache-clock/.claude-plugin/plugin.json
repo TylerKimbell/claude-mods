@@ -1,0 +1,23 @@
+{
+  "name": "cache-clock",
+  "version": "0.6.0",
+  "description": "A one-line band above the prompt: context used, and a countdown until the prompt cache goes cold. Fork of Ray Amjad's cache-clock that also restarts the clock when a mod (cache-warmer) forks over the transcript; handoff off by default.",
+  "author": {
+    "name": "Ray Amjad",
+    "url": "https://github.com/ray-amjad"
+  },
+  "repository": "https://github.com/TylerKimbell/claude-mods/tree/main/mods/cache-clock",
+  "license": "MIT",
+  "userConfig": {
+    "onWarning": {
+      "type": "string",
+      "title": "When the cache is about to go cold",
+      "description": "What to do at the warning if you haven't replied. handoff: Claude writes a per-session HANDOFF-<id>.md. off: just the toast. To compact instead, use Claude Code's own idle compaction (2.1.299+).",
+      "options": [
+        "handoff",
+        "off"
+      ],
+      "default": "off"
+    }
+  }
+}

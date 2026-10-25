@@ -9,8 +9,9 @@ import type { Credits, View } from '../types'
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
 const STORE_LAST = 'last'
 const STORE_WARNED = 'warnedAt'
-const MIN_REFRESH_MS = 60_000
-const DEFAULT_POLL_MINUTES = 5
+const MIN_REFRESH_MS = 5 * 60_000
+const BACKOFF_MS = 15 * 60_000
+const DEFAULT_POLL_MINUTES = 10
 const DEFAULT_WARN_AT = 80
 
 const credits = atom({ plugin: 'usage-credits', key: 'credits' } as const, null as Credits | null)
@@ -112,6 +113,8 @@ const fmtAgo = (ms: number): string => {
 // Refreshing. Module scope is fine for the in-flight flag: a reload starts it over.
 
 let isRefreshing = false
+// After a 429 the endpoint is left alone until this time.
+let backoffUntil = 0
 
 type RefreshOptions = { isForced: boolean; warnAt: number }
 
@@ -132,6 +135,7 @@ async function refresh($: EngineInterface, opts: RefreshOptions): Promise<Credit
   const now = await $.clock.now()
   const prev = await read($, credits)
   if (!opts.isForced && prev && now - prev.fetchedAt < MIN_REFRESH_MS) return prev
+  if (now < backoffUntil) return prev
   isRefreshing = true
   try {
     const auth = await $.session.authorize()
@@ -144,7 +148,15 @@ async function refresh($: EngineInterface, opts: RefreshOptions): Promise<Credit
       headers: { 'anthropic-beta': 'oauth-2025-04-20', 'content-type': 'application/json' },
     })
     if (!res.ok) {
-      await update($, view, v => ({ ...v, error: res.status === 429 ? 'refused (429)' : `failed (${res.status})` }))
+      if (res.status === 429) {
+        // Honour Retry-After, else stay away a good while: another mod polls this endpoint too.
+        const header = Object.entries(res.headers ?? {}).find(([k]) => k.toLowerCase() === 'retry-after')?.[1]
+        const seconds = Number(header)
+        backoffUntil = now + Math.max(BACKOFF_MS, Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 0)
+        await update($, view, v => ({ ...v, error: `refused (429), retrying in ${Math.round((backoffUntil - now) / 60_000)}m` }))
+        return prev
+      }
+      await update($, view, v => ({ ...v, error: `failed (${res.status})` }))
       return prev
     }
     const next = parseCredits(res.text, now)

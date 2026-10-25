@@ -122,7 +122,7 @@ describe('usage-credits', () => {
     await ui.unmount()
   })
 
-  test('a turn refreshes at most once a minute; the poll runs on its own', async ($, on) => {
+  test('a turn refreshes at most every five minutes; the poll runs every ten', async ($, on) => {
     const clock = mock.clock(on, { now: 1_000_000 })
     const w = world(on)
     await $.session.start(session)
@@ -130,12 +130,28 @@ describe('usage-credits', () => {
     await $.turn.complete({ answer: 'x', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never)
     await clock.advance(1)
     expect(w.fetches).toBe(1)
-    await clock.advance(61_000)
+    await clock.advance(5 * 60_000 + 1_000)
     await $.turn.complete({ answer: 'x', durationMs: 1, isAborted: false, turnId: 't2', reason: 'answer' } as never)
     await clock.advance(1)
     expect(w.fetches).toBe(2)
-    await clock.advance(5 * 60_000)
+    await clock.advance(10 * 60_000)
     expect(w.fetches).toBe(3)
+  })
+
+  test('a 429 backs off for at least fifteen minutes and keeps the last reading', async ($, on) => {
+    const clock = mock.clock(on, { now: 1_000_000 })
+    const w = world(on)
+    await $.session.start(session)
+    await clock.advance(1)
+    w.status = 429
+    await clock.advance(10 * 60_000)
+    expect(w.fetches).toBe(2)
+    // The next poll lands inside the backoff: no request.
+    await clock.advance(10 * 60_000)
+    expect(w.fetches).toBe(2)
+    const out = await $.command.run({ command: 'credits', args: '' })
+    expect(String(out.text)).toContain('$57.51 left')
+    expect(String(out.text)).toContain('refused (429)')
   })
 
   test('toasts once when crossing the warn level and again near the end', async ($, on) => {
@@ -145,10 +161,10 @@ describe('usage-credits', () => {
     await clock.advance(1)
     expect(w.toasts.length).toBe(1)
     expect(w.toasts[0]).toContain('85%')
-    await clock.advance(5 * 60_000)
+    await clock.advance(10 * 60_000)
     expect(w.toasts.length).toBe(1)
     w.used = 9700
-    await clock.advance(5 * 60_000)
+    await clock.advance(10 * 60_000)
     expect(w.toasts.length).toBe(2)
     expect(w.toasts[1]).toContain('nearly gone')
   })
@@ -159,7 +175,7 @@ describe('usage-credits', () => {
     await $.session.start(session)
     await clock.advance(1)
     w.status = 500
-    await clock.advance(5 * 60_000)
+    await clock.advance(10 * 60_000)
     const ui = await $.ui.mount({ plugin: 'usage-credits', surface: 'terminal', component: 'AbovePrompt', props: band })
     expect(String((await ui.find({ type: 'Text', text: /Credits/ }))?.text)).toContain('$57.51 left')
     expect(String((await ui.find({ type: 'Text', text: /failed/ }))?.text)).toContain('failed (500)')
