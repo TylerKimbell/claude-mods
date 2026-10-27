@@ -3,12 +3,17 @@ import type { On } from 'claude-code'
 
 import type { Alert } from '../types'
 
-type World = { asks: string[]; answers: string[]; alert: Alert | null; ran: string[] }
+type World = { asks: string[]; answers: string[]; alert: Alert | null; ran: string[]; lines: (string | undefined)[] }
 
 // The engine beneath the mod: the command registers, panes open and close, the ask
 // dialog answers from a queue, and a tool call that reaches the bottom runs.
 function world(on: On, answers: string[]): World {
-  const w: World = { asks: [], answers, alert: null, ran: [] }
+  const w: World = { asks: [], answers, alert: null, ran: [], lines: [] }
+  on('ui.status', ($, e) => {
+    w.lines.push((e as unknown as { text?: string }).text)
+    return { value: undefined }
+  })
+  on('turn.start', ($, e) => ({ turnId: e.turnId }))
   on('state.set', ($, e, next) => {
     const write = e as unknown as { plugin: string; key: string; value: unknown }
     if (write.plugin === 'launch-codes' && write.key === 'alert') w.alert = write.value as Alert | null
@@ -100,6 +105,43 @@ describe('launch-codes', () => {
     expect(fine.deny).toBe(undefined)
     expect(w.ran).toEqual(['/app/.env.example'])
   })
+
+  for (const kind of ['composer', 'sdk', 'bridge'] as const) {
+    test(`/launch-codes off typed by the person (${kind}) skips the checks for the session; on brings them back`, async ($, on) => {
+      mock.clock(on, { now: 1_000_000 })
+      const w = world(on, ['ABORT'])
+      await $.session.start(session)
+      const out = await $.command.run({ command: 'launch-codes', args: 'off', origin: { kind } } as never)
+      expect(String(out.text)).toContain('OFF for this session')
+      expect(String(w.lines[w.lines.length - 1])).toContain('launch-codes OFF')
+      // Risky commands and .env edits now run with no dialog.
+      expect((await $.tool.call({ tool: 'Bash', command: 'git push --force origin main' })).deny).toBe(undefined)
+      expect((await $.tool.call({ tool: 'PowerShell', command: 'Remove-Item -Recurse -Force C:\\work' })).deny).toBe(undefined)
+      expect((await $.tool.call({ tool: 'Edit', file_path: '/app/.env', old_string: 'A=1', new_string: 'A=2' })).deny).toBe(undefined)
+      expect(w.asks.length).toBe(0)
+      // The reminder is pinned again at each turn.
+      w.lines.length = 0
+      await $.turn.start({ text: 'go', turnId: 't1' })
+      expect(String(w.lines[w.lines.length - 1])).toContain('launch-codes OFF')
+      // On again: the guard asks, and ABORT blocks.
+      await $.command.run({ command: 'launch-codes', args: 'on', origin: { kind } } as never)
+      expect(w.lines[w.lines.length - 1]).toBe(undefined)
+      expect(typeof (await $.tool.call({ tool: 'Bash', command: 'git push --force origin main' })).deny).toBe('string')
+      expect(w.asks.length).toBe(1)
+    })
+  }
+
+  for (const origin of [{ kind: 'plugin', name: 'some-mod' }, { kind: 'peer' }, { kind: 'scheduled-trigger' }, { kind: 'task-notification' }, { kind: 'unclassified' }]) {
+    test(`/launch-codes off from ${origin.kind} is refused and the guard stays on`, async ($, on) => {
+      mock.clock(on, { now: 1_000_000 })
+      const w = world(on, ['ABORT'])
+      await $.session.start(session)
+      const out = await $.command.run({ command: 'launch-codes', args: 'off', origin } as never)
+      expect(String(out.text)).toContain('only works when you type it yourself')
+      expect(typeof (await $.tool.call({ tool: 'Bash', command: 'rm -rf ./important' })).deny).toBe('string')
+      expect(w.ran).toEqual([])
+    })
+  }
 
   test('/launch-codes test says which commands need codes', async ($, on) => {
     mock.clock(on, { now: 1_000_000 })

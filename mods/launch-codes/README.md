@@ -29,6 +29,9 @@ Files (option `protectEnv`, on by default):
 
 - `/launch-codes test <command>` says whether a command would need codes.
 - `/launch-codes demo` runs the ceremony on a placeholder command. Nothing runs.
+- `/launch-codes off` skips every check for the rest of this session, so a session you know will run risky commands doesn't need watching. The status line under the prompt says `launch-codes OFF for this session` the whole time. `/launch-codes on` turns the guard back on; every new session starts guarded. It survives `/reload-plugins`.
+
+`off` and `on` only work when you type them yourself, at the prompt, in the desktop app or through Remote Control. A command from anywhere else (a plugin, a schedule, another session, a notification, a channel) is refused, so Claude cannot switch the guard off on its own.
 
 ## Options
 

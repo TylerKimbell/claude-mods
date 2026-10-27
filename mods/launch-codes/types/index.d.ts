@@ -15,6 +15,10 @@ export type Alert = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'launch-codes': { alert: Alert | null }
+    'launch-codes': {
+      alert: Alert | null
+      /** /launch-codes off: the checks are skipped for the rest of this session. */
+      isOff: boolean
+    }
   }
 }

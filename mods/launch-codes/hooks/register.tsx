@@ -10,6 +10,15 @@ const PANE = 'launch-codes'
 const DEFAULT_CODE_SECONDS = 45
 
 const alert = atom({ plugin: 'launch-codes', key: 'alert' } as const, null as Alert | null)
+// Session state: survives /reload-plugins, starts false in every new session.
+const off = atom({ plugin: 'launch-codes', key: 'isOff' } as const, false)
+
+const OFF_STATUS = 'launch-codes OFF for this session · /launch-codes on to guard again'
+// Who may switch the guard off: the person, typing at a terminal (composer), through
+// Remote Control (bridge), or in a host such as the desktop app (sdk). Never a
+// notification, a schedule, another session, a channel, a plugin, or an origin the
+// engine cannot attest.
+export const PERSON_ORIGINS: ReadonlySet<string> = new Set(['composer', 'bridge', 'sdk'])
 
 const RED = '#e5484d'
 const GOLD = '#c2a87e'
@@ -97,13 +106,23 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'launch-codes',
-      description: 'Launch codes for risky commands: /launch-codes [demo|test <command>]',
+      description: 'Launch codes for risky commands: /launch-codes [demo | test <command> | off | on]',
     })
+    // After a reload, a session that switched the guard off still says so.
+    if (await read($, off)) $.ui.status(OFF_STATUS)
+    return next(e)
+  })
+
+  // The reminder is pinned again at each turn: one set while a session starts can land
+  // before the app attaches.
+  on('turn.start', async ($, e, next) => {
+    if (!e.agentId && (await read($, off))) $.ui.status(OFF_STATUS)
     return next(e)
   })
 
   // --- Bash
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
+    if (await read($, off)) return next(e)
     const danger = classify(e.command)
     if (!danger) return next(e)
     const verdict = await ceremony($, 'Bash', e.command, danger.reason, false, ttlMs())
@@ -118,6 +137,7 @@ export const register: Register = (on, options) => {
 
   // --- PowerShell
   on('tool.call', { tool: 'PowerShell' }, async ($, e, next) => {
+    if (await read($, off)) return next(e)
     const danger = classifyPowerShell(e.command)
     if (!danger) return next(e)
     const verdict = await ceremony($, 'PowerShell', e.command, danger.reason, false, ttlMs())
@@ -131,6 +151,7 @@ export const register: Register = (on, options) => {
   // --- .env files
   const ENV_REASON = 'edits a .env file that may hold secrets'
   on('tool.call', { tool: 'Edit' }, async ($, e, next) => {
+    if (await read($, off)) return next(e)
     if (!isEnvGuarded() || !isProtectedFile(e.file_path)) return next(e)
     const verdict = await ceremony($, 'Edit', e.file_path, ENV_REASON, false, ttlMs())
     return verdict.isLaunch ? next(e) : deny(e.file_path, ENV_REASON, verdict.why)
@@ -140,6 +161,7 @@ export const register: Register = (on, options) => {
   })
 
   on('tool.call', { tool: 'Write' }, async ($, e, next) => {
+    if (await read($, off)) return next(e)
     if (!isEnvGuarded() || !isProtectedFile(e.file_path)) return next(e)
     const verdict = await ceremony($, 'Write', e.file_path, ENV_REASON, false, ttlMs())
     return verdict.isLaunch ? next(e) : deny(e.file_path, ENV_REASON, verdict.why)
@@ -151,6 +173,20 @@ export const register: Register = (on, options) => {
   // --- /launch-codes
   on('command.run', { command: 'launch-codes' }, async ($, e) => {
     const arg = e.args.trim()
+    if (arg === 'off' || arg === 'on') {
+      const from = e.origin?.kind ?? 'unknown'
+      if (!PERSON_ORIGINS.has(from)) {
+        return { text: `launch-codes: /launch-codes ${arg} only works when you type it yourself (this one came from ${from}). Nothing changed.` }
+      }
+      await update($, off, () => arg === 'off')
+      $.ui.status(arg === 'off' ? OFF_STATUS : undefined)
+      return {
+        text:
+          arg === 'off'
+            ? 'Launch codes OFF for this session: risky commands and .env edits run without a code. /launch-codes on turns the guard back on. New sessions start guarded.'
+            : 'Launch codes on: risky commands and .env edits need a code again.',
+      }
+    }
     if (arg.startsWith('test ')) {
       const cmd = arg.slice(5)
       const danger = classify(cmd) ?? classifyPowerShell(cmd)
@@ -161,7 +197,7 @@ export const register: Register = (on, options) => {
       const verdict = await ceremony($, 'Bash', command, 'rm -rf on ~/Projects/prod-backup', true, ttlMs())
       return { text: verdict.isLaunch ? 'Demo: LAUNCHED. (Nothing ran, it was a demo.)' : `Demo: aborted, ${verdict.why}. Nothing ran.` }
     }
-    return { text: 'Usage: /launch-codes demo, or /launch-codes test <command>' }
+    return { text: 'Usage: /launch-codes demo | test <command> | off | on' }
   })
 
   // --- the pane
