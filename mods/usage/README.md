@@ -6,11 +6,11 @@ Your plan's 5-hour and weekly use and your usage credits, in the status line und
 usage  5h 10% · Weekly 2% · $91.49 left
 ```
 
-**5h** and **Weekly** are the plan's two rate-limit windows. They come from the engine after every reply, at no cost, and from the usage endpoint this mod already reads. Within one window the higher reading stands, since the per-reply figures are whole percents and can lag the service. A window whose reset has passed reads 0%. The `showWindows` option takes them off the line.
+**5h** and **Weekly** are the plan's two rate-limit windows. They come from the engine after every reply, at no cost, and from the account's usage endpoint (described under "Where the numbers come from" below). Within one window the higher reading stands, since the per-reply figures are whole percents and can lag the service. A window whose reset has passed reads 0%. The `showWindows` option takes them off the line.
 
 **Credits** is your purchased balance, as the billing page's Usage credits section shows it. The line adds a flag only when something stops credits being spent: `· monthly limit reached` if you have a monthly spend limit and hit it, `· credits off` if usage credits are switched off.
 
-`/credits` prints the longer form: the two windows with their reset times (`Plan: 5-hour 10% (resets in 3h 11m) · weekly 2% (resets in 1d 17h)`), then the credits with this month's spend: `$91.49 left · no monthly limit, $93.84 spent this month`, or `· this month $93.84 of $100 monthly limit (94%)` when a limit is set. The 80% and 95% toasts only fire when a monthly limit is set.
+`/credits` prints the longer form: the two windows with their reset times (`Plan: 5-hour 10% (resets in 3h 11m) · weekly 2% (resets in 1d 17h)`), then the credits with this month's spend: `$91.49 left · no monthly limit, $93.84 spent this month`, or `· this month $93.84 of $100 monthly limit (94%)` when a limit is set. The `warnAt` toasts (80% by default, then 95%) track spend against the monthly limit only, never the purchased balance or the 5-hour and weekly windows, so they only fire when a monthly limit is set. Change the first level with the `warnAt` option.
 
 If the balance cannot be read, the line falls back to what a monthly limit still allows: `Credits $6.16 left of $100 · 94%`. The balance and the monthly-limit figures are read separately, so a refusal from one endpoint does not hold back the other.
 
@@ -24,7 +24,7 @@ The same account endpoints the app reads, through the session's own Claude login
 
 Nothing is sent anywhere but Anthropic.
 
-It refreshes at session start, every `pollMinutes` (default 5), and after each of Claude's turns at most once a minute, since spend moves after a turn. The last reading is kept across sessions, so the row shows at once and the fresh number replaces it.
+It refreshes at session start, every `pollMinutes` (default 10), and after each of Claude's turns at most once every five minutes, since spend moves after a turn. The last reading is kept across sessions, so the row shows at once and the fresh number replaces it.
 
 Only Claude subscriptions have usage credits. With an API key or a gateway there is nothing to show and the row stays off.
 
@@ -35,8 +35,8 @@ Only Claude subscriptions have usage credits. With an API key or a gateway there
 
 ## Options
 
-- `pollMinutes` (default 5): how often to refresh.
-- `warnAt` (default 80): a toast once usage crosses this percent, and another at 95.
+- `pollMinutes` (default 10): how often to refresh.
+- `warnAt` (default 80): a toast once this month's spend crosses this percent of the monthly limit, and another at 95. Does nothing without a monthly limit.
 - `showWindows` (default true): show the 5-hour and weekly windows on the line.
 - `showBand` (default false): also draw the credits row above the prompt.
 

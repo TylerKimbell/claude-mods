@@ -20,7 +20,7 @@
     "maxHours": {
       "type": "number",
       "title": "Stop after this many idle hours",
-      "description": "Pings stop once the session has been idle this long; your next message starts a fresh run",
+      "description": "Pings stop once the session has been idle this long, counted as a cap of maxHours*60/ttlMinutes pings; your next message starts a fresh run",
       "default": 4
     },
     "minTokens": {

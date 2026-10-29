@@ -16,7 +16,7 @@ So the saving is real only if you come back to the session. When you are done wi
 ## Rules
 
 - Pings only while no turn is running, `leadMinutes` (default 4) before the cache's `ttlMinutes` (default 60) are up.
-- Stops after `maxHours` (default 4) of idle time. Your next message starts a fresh run.
+- Stops after `maxHours` (default 4) of idle time. `maxHours` is really a cap on pings, `maxHours*60/ttlMinutes` of them (4 at the defaults), so a shorter `ttlMinutes` allows more pings in the same hours. Your next message starts a fresh run.
 - Skips a context under `minTokens` (default 100k): too small to be worth it.
 - If a ping is not served from the cache (under half the context read back), it stops for the run rather than paying full price again, and says so.
 - If the cache already went cold before a ping was due, it does nothing: paying the write now or later costs the same.

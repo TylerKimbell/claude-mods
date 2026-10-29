@@ -8,9 +8,9 @@ Context  48% used  490k free of 1M          ○ Auto compact   [ Compact ]  ▼
 Messages 419k   Tools 39k   Other 18k
 ```
 
-- **Context**: how full the window is (amber from 50%, red from 80%), what is free, and a bar split into Messages, Tools and Other.
+- **Context**: how full the window is (amber from 50%, red from 80%), what is free, and a bar split into Messages, Tools and Other. The percent counts used tokens only. Free is the window less what is used and less Claude Code's autocompact buffer (the headroom it reserves for compacting, which `/context` lists as its own category), so in the example the 48% used and 490k free leave about 34k for the buffer out of the 1M window. The numbers depend on the buffer's size.
 - **Compact** runs `/compact` in one click.
-- **Auto compact** compacts between turns once the context reaches your % (30% by default, 15 to 99), never mid-reply. Each session keeps its own setting; a new session starts with it off. If the context is already past your % when you turn it on, it asks: compact now, or after your next compaction.
+- **Auto compact** compacts between turns once the context reaches your % (30% by default, 15 to 99), never mid-reply. Each session keeps its own setting; a new session starts with it off. If the context is already past your % when you turn it on (or you lower the %), it asks `Now` or `After my next compact`: `Now` compacts at once; `After my next compact` holds auto compact off until the next compaction, however it happens (the Compact button, `/compact`, or Claude Code's own), and from then on it acts as usual. Leaving the question unanswered counts as `After my next compact`.
 - **▼ / ▲** collapses the band to the summary row and the bar. The setting is shared by every session.
 - `/quota` turns the band off and on.
 

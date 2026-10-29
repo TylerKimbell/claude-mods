@@ -18,8 +18,8 @@ Every request to the model writes the conversation to the prompt cache. If the n
 - At zero it says `cache cold`, and a toast tells you the next message is a full-price write.
 - The TTL is read from the session itself: the API records whether each cache write was a 1 hour or a 5 minute one, and the countdown uses it from then on.
 - At the warning, if Claude is idle and you haven't replied, it acts while the cache is still warm. You pick what it does in the plugin's settings (`onWarning`):
-  - `handoff` (the default): Claude writes a handoff note, `HANDOFF-<first 8 characters of the session id>.md`, in the project root, in case you don't come back. Each session has its own file, so parallel sessions in one folder don't overwrite each other.
-  - `off`: just the toast.
+  - `handoff`: Claude writes a handoff note, `HANDOFF-<first 8 characters of the session id>.md`, in the project root, in case you don't come back. Each session has its own file, so parallel sessions in one folder don't overwrite each other.
+  - `off` (the default): just the toast.
 
   It runs once per idle stretch and re-arms when you send a message.
 - Want the session compacted instead? Use Claude Code's own idle compaction (2.1.299 and later, on by default): a conversation of 200K+ tokens left idle for about 54 minutes is compacted before its one-hour cache expires. Turn it on or off with `Idle compaction` in `/config`, and change the 200K minimum with `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS`. The mod's own `compact` option is gone; a saved `compact` now acts as `off`.
@@ -47,7 +47,7 @@ Or inside Claude Code: `/plugin install cache --marketplace TylerKimbell/claude-
 | `CACHE_CLOCK_SUB_TTL_MIN` | 5 | Subagent TTL |
 | `CACHE_CLOCK_WARN_MIN` | 5 | Toast, the onWarning action and the colour red when this much is left |
 | `CACHE_CLOCK_ON_WARNING` | the setting | `handoff` or `off`; overrides the plugin setting |
-| `CACHE_CLOCK_AUTO_HANDOFF` | on | `0` means `off` (kept from older versions) |
+| `CACHE_CLOCK_AUTO_HANDOFF` | unset | `0` means `off` (kept from older versions); any other value leaves the setting in charge |
 | `CACHE_CLOCK_HANDOFF_DIR` | project root | Folder the handoff notes go to |
 | `CACHE_CLOCK_SOUND` | off | `1` plays `sounds/cooling.wav` with the warning toast |
 
@@ -75,7 +75,7 @@ CACHE_CLOCK_MAIN_TTL_MIN=2 CACHE_CLOCK_WARN_MIN=1.5 claude
 ## Develop
 
 ```
-claude --plugin-dir ./cache
-claude plugin validate .
-claude plugin test .
+claude --plugin-dir ./mods/cache   # from the repo root
+claude plugin validate mods/cache
+claude plugin test mods/cache
 ```

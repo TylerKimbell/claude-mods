@@ -8,13 +8,13 @@
     "pollMinutes": {
       "type": "number",
       "title": "Refresh every (minutes)",
-      "description": "How often to ask the account for the credit balance; it is also refreshed after a turn, at most every five minutes. The endpoint rate-limits, and usage-quota polls it too, so keep this modest",
+      "description": "How often to ask the account for the credit balance; it is also refreshed after a turn, at most every five minutes. The endpoint rate-limits, so keep this modest",
       "default": 10
     },
     "warnAt": {
       "type": "number",
       "title": "Warn at (percent used)",
-      "description": "A toast when usage crosses this percent, and again at 95",
+      "description": "A toast when this month's spend crosses this percent of your monthly limit, and again at 95. Only fires when a monthly limit is set",
       "default": 80
     },
     "showBand": {
