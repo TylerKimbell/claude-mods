@@ -7,7 +7,7 @@ This is a fork of [Ray Amjad's cache-clock](https://github.com/ray-amjad/claude-
 - The clock also restarts when a mod forks over the transcript, which is what [cache-warmer](../cache-warmer/README.md)'s ping is. Upstream only sees a turn's own requests and `/recap` or `/btw`, so after a warming ping it would say the cache went cold when it had not.
 - `onWarning` defaults to `off` (no handoff note written into the project).
 - The line moved from the band above the prompt to the status line under it: `cache ◷ 59:43 left · 1h ttl`. The desktop app's next-step card covers the band, and the status line stays on screen.
-- The mod is named `cache`, since the app heads the status entry with the mod's name, and the line is kept short so the status line does not overflow into its `+1` fold. The `ctx` piece (context used, with its ten-block bar) is gone too: [usage-quota](../usage-quota/README.md)'s band shows the same figure with a breakdown.
+- The mod is named `cache`, since the app heads the status entry with the mod's name, and the line is kept short so the status line does not overflow into its `+1` fold. The `ctx` piece (context used, with its ten-block bar) is gone too: [ctx-info](../ctx-info/README.md)'s band shows the same figure with a breakdown.
 
 Install this one instead of the upstream, not alongside it.
 

@@ -6,18 +6,18 @@ import type { EngineInterface, Register, SessionRateLimit } from 'claude-code'
 
 import type { AutoCompact, Category, Hold, Limit, PaceOf, Snapshot } from '../types'
 
-const snapshot = atom({ plugin: 'usage-quota', key: 'snapshot' } as const, null)
-const isOn = atom({ plugin: 'usage-quota', key: 'isOn' } as const, true)
-const isCollapsed = atom({ plugin: 'usage-quota', key: 'isCollapsed' } as const, false)
-const autoCompact = atom({ plugin: 'usage-quota', key: 'autoCompact' } as const, { isOn: false, at: null } as AutoCompact)
-const fieldTick = atom({ plugin: 'usage-quota', key: 'fieldTick' } as const, 0)
+const snapshot = atom({ plugin: 'ctx-info', key: 'snapshot' } as const, null)
+const isOn = atom({ plugin: 'ctx-info', key: 'isOn' } as const, true)
+const isCollapsed = atom({ plugin: 'ctx-info', key: 'isCollapsed' } as const, false)
+const autoCompact = atom({ plugin: 'ctx-info', key: 'autoCompact' } as const, { isOn: false, at: null } as AutoCompact)
+const fieldTick = atom({ plugin: 'ctx-info', key: 'fieldTick' } as const, 0)
 // the % field's text while typing is cleaned (digits only, 3 at most); null: the set %
-const fieldText = atom({ plugin: 'usage-quota', key: 'fieldText' } as const, null as string | null)
-const theme = atom({ plugin: 'usage-quota', key: 'theme' } as const, 'dark' as 'dark' | 'light')
-const autoAsk = atom({ plugin: 'usage-quota', key: 'autoAsk' } as const, null as { at: number; percent: number } | null)
+const fieldText = atom({ plugin: 'ctx-info', key: 'fieldText' } as const, null as string | null)
+const theme = atom({ plugin: 'ctx-info', key: 'theme' } as const, 'dark' as 'dark' | 'light')
+const autoAsk = atom({ plugin: 'ctx-info', key: 'autoAsk' } as const, null as { at: number; percent: number } | null)
 // what holds auto compact back, and in which chat: kept in state so a reload (an
 // update, /reload-plugins) keeps it, where a module variable would start over
-const hold = atom({ plugin: 'usage-quota', key: 'hold' } as const, { chat: '', waits: false, stuck: false } as Hold)
+const hold = atom({ plugin: 'ctx-info', key: 'hold' } as const, { chat: '', waits: false, stuck: false } as Hold)
 
 // two palettes, the desktop's dark and light themes; the band draws in the one the
 // app shows (Theme), set at the start of every draw so all colours below follow it
@@ -179,10 +179,12 @@ async function storeGet($: EngineInterface, key: string): Promise<unknown> {
   }
 }
 
-// v0.1.5 renamed the plugin from claude-code-usage-quota, a name kept for Anthropic's
-// own plugins. Its store is a file under the old name, so what it held (each chat's
-// auto compact, the learned pace) is copied over once, never over a newer value
-const OLD_STORE = 'claude-code-usage-quota_claude-code-usage-quota-mod-'
+// The store is a file named after the plugin and its marketplace, so a rename leaves
+// what it held (each chat's auto compact, the collapsed band, the learned pace) behind.
+// It is copied over once from the newest file under the first old name found, never
+// over a newer value: this mod was usage-quota in claude-mods, and upstream it was
+// usage-quota after v0.1.5 renamed it from claude-code-usage-quota.
+const OLD_STORES = ['usage-quota_claude-mods-', 'usage-quota_claude-code-usage-quota-mod-', 'claude-code-usage-quota_claude-code-usage-quota-mod-']
 async function migrateStore($: EngineInterface): Promise<void> {
   if (await storeGet($, 'migrated')) return
   try {
@@ -190,9 +192,9 @@ async function migrateStore($: EngineInterface): Promise<void> {
     const config = (await $.env.get('CLAUDE_CONFIG_DIR')) ?? (home ? `${home}/.claude` : undefined)
     if (config) {
       const dir = `${config}/plugins/store`
-      const old = (await $.fs.list(dir))
-        .filter(f => f.kind === 'file' && f.name.startsWith(OLD_STORE) && f.name.endsWith('.json'))
-        .sort((a, b) => b.mtimeMs - a.mtimeMs)[0]
+      const files = (await $.fs.list(dir)).filter(f => f.kind === 'file' && f.name.endsWith('.json')).sort((a, b) => b.mtimeMs - a.mtimeMs)
+      const prefix = OLD_STORES.find(p => files.some(f => f.name.startsWith(p)))
+      const old = prefix ? files.find(f => f.name.startsWith(prefix)) : undefined
       if (old) {
         const saved = JSON.parse(String(await $.fs.read(`${dir}/${old.name}`))) as Record<string, unknown>
         for (const [key, value] of Object.entries(saved)) {
@@ -201,7 +203,7 @@ async function migrateStore($: EngineInterface): Promise<void> {
       }
     }
   } catch (error) {
-    $.ui.log(`usage-quota: the old settings could not be copied: ${error instanceof Error ? error.message : String(error)}`, { to: 'debug' })
+    $.ui.log(`ctx-info: the old settings could not be copied: ${error instanceof Error ? error.message : String(error)}`, { to: 'debug' })
   }
   await storeSet($, 'migrated', true)
 }
@@ -256,7 +258,7 @@ async function calibrate($: EngineInterface): Promise<void> {
     await $.store.set('calib', next)
     lastSnapshot = ''
   } catch (error) {
-    $.ui.log(`usage-quota: exact count failed: ${error instanceof Error ? error.message : String(error)}`, { to: 'debug' })
+    $.ui.log(`ctx-info: exact count failed: ${error instanceof Error ? error.message : String(error)}`, { to: 'debug' })
   } finally {
     isCalibrating = false
   }
@@ -336,7 +338,7 @@ function autoCompactNow($: EngineInterface, attempt = 1): void {
       if (attempt < AUTO_TRIES) return autoCompactNow($, attempt + 1)
       isCompacting = false
       $.ui.toast(`Auto compact could not start: ${reason}`)
-      $.ui.log(`usage-quota: auto compact failed: ${reason}`, { to: 'debug' })
+      $.ui.log(`ctx-info: auto compact failed: ${reason}`, { to: 'debug' })
     }
   })
 }
@@ -535,7 +537,7 @@ async function syncTheme($: EngineInterface): Promise<void> {
       themeFile = { mtimeMs, mode }
     }
   } catch (error) {
-    if (!didLogTheme) $.ui.log(`usage-quota: the app's theme could not be read: ${error instanceof Error ? error.message : String(error)}`, { to: 'debug' })
+    if (!didLogTheme) $.ui.log(`ctx-info: the app's theme could not be read: ${error instanceof Error ? error.message : String(error)}`, { to: 'debug' })
     didLogTheme = true
     return
   }
@@ -616,7 +618,7 @@ async function refresh($: EngineInterface, ask: Ask = 'no'): Promise<void> {
     hadError = false
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    $.ui.status(`usage-quota: ${message.replace(/^usage-quota: /, '')}`)
+    $.ui.status(`ctx-info: ${message.replace(/^ctx-info: /, '')}`)
     hadError = true
   } finally {
     isRefreshing = false
@@ -630,7 +632,7 @@ async function refresh($: EngineInterface, ask: Ask = 'no'): Promise<void> {
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'quota', description: 'Toggle the context band above the prompt (context use, Compact, Auto compact)' })
+    await $.command.register({ name: 'ctx-info', description: 'Toggle the context band above the prompt (context use, Compact, Auto compact)' })
     const result = await next(e)
     await migrateStore($)
     try {
@@ -694,7 +696,7 @@ export const register: Register = on => {
     return result
   })
 
-  on('command.run', { command: 'quota' }, async $ => {
+  on('command.run', { command: 'ctx-info' }, async $ => {
     const now = !(await read($, isOn))
     await update($, isOn, () => now)
     if (now) await refresh($, 'now')

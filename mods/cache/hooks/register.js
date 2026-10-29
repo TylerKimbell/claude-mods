@@ -1,7 +1,7 @@
 // Fork of Ray Amjad's cache-clock 0.5.4 (MIT) in TylerKimbell/claude-mods: also restarts the clock on a mod's fork over the transcript.
 // cache (the mod was cache-clock): a status line entry under the prompt that counts down until the prompt cache
 // goes cold. The status line stays on screen when the desktop app's next-step card covers the
-// band above the prompt; context use is usage-quota's band.
+// band above the prompt; context use is ctx-info's band.
 
 // Defaults, in minutes. Each can be changed with an environment variable.
 const DEFAULT_MAIN_TTL_MIN = 60 // main session cache (matches what the transcripts record)

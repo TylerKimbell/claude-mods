@@ -16,18 +16,18 @@ Every step is safe to run again on a machine that already has some of this insta
 | 4 | `cache-warmer@claude-mods` | this repo | Keeps big sessions' cache warm while idle |
 | 5 | `launch-codes@claude-mods` | this repo | Code-and-LAUNCH guard on risky commands and .env edits |
 | 6 | `usage@claude-mods` | this repo | 5-hour and weekly use and credits left, on the status line |
-| 7 | `usage-quota@claude-mods` | this repo | The context band: context use, Compact, Auto compact (our fork) |
+| 7 | `ctx-info@claude-mods` | this repo | The context band: context use, Compact, Auto compact (our fork) |
 
 Do **not** install these, on purpose:
 
 - `cache-clock@claude-code-mods` (Ray Amjad's original). Ours in `mods/cache` replaces it. Both together draw two countdowns.
 - `cache-clock@claude-mods` and `usage-credits@claude-mods`: the earlier names of `cache` and `usage`. Each pair together draws its status entry twice.
-- `usage-quota@claude-code-usage-quota-mod` (Anant Raghunath's original). Ours in `mods/usage-quota` replaces it. The original also draws the 5-hour and weekly meters, polls the usage endpoint every two minutes (which gets refused with 429s), and hides every band row installed after it.
+- `usage-quota@claude-code-usage-quota-mod` (Anant Raghunath's original). Ours, `ctx-info` in `mods/ctx-info`, replaces it. The original also draws the 5-hour and weekly meters, polls the usage endpoint every two minutes (which gets refused with 429s), and hides every band row installed after it.
 - next-steps (spends tokens every turn) and secret-box (not needed).
 
 ## Install order
 
-Mods load in install order, and that order sets two layouts. The band above the prompt is drawn in it: the first mod's row on top, each passing the rest down. Every mod here passes the draw down, so the order hides nothing. The status line under the prompt lists each mod's entry in it too, left to right. So cache goes before launch-codes and usage (its countdown reads first), and usage-quota goes last so the context band sits right above the prompt. Step 7 checks both. To reorder later, uninstall the mods that should come later and install them again.
+Mods load in install order, and that order sets two layouts. The band above the prompt is drawn in it: the first mod's row on top, each passing the rest down. Every mod here passes the draw down, so the order hides nothing. The status line under the prompt lists each mod's entry in it too, left to right. So cache goes before launch-codes and usage (its countdown reads first), and ctx-info goes last so the context band sits right above the prompt. Step 7 checks both. To reorder later, uninstall the mods that should come later and install them again.
 
 ## Steps
 
@@ -59,11 +59,12 @@ Then, before installing anything, remove the originals our forks replace, if the
 ```bash
 claude plugin uninstall cache-clock@claude-code-mods
 claude plugin uninstall usage-quota@claude-code-usage-quota-mod
+claude plugin uninstall usage-quota@claude-mods
 claude plugin uninstall cache-clock@claude-mods
 claude plugin uninstall usage-credits@claude-mods
 ```
 
-The last two are the earlier names of `cache` and `usage`; an uninstall of a plugin that is not installed just says so.
+The last three are the earlier names of `ctx-info`, `cache` and `usage`; an uninstall of a plugin that is not installed just says so.
 
 ### 4. Add the two marketplaces
 
@@ -91,10 +92,10 @@ claude plugin install usage@claude-mods --scope user
 
 Messages about userConfig options not being set are expected: every mod's defaults are the setup. Nothing needs configuring.
 
-### 6. Install usage-quota last
+### 6. Install ctx-info last
 
 ```bash
-claude plugin install usage-quota@claude-mods --scope user
+claude plugin install ctx-info@claude-mods --scope user
 ```
 
 ### 7. Check the load order
@@ -108,7 +109,7 @@ grep -o "hooks module [a-z-]*@[a-z-]* loaded (worker, environment [0-9]*" "$T/mo
 rm "$T/mods-order.log"
 ```
 
-`claude plugin list` sorts by name, so it cannot show the order; this can. Expect seven lines, usage-quota last:
+`claude plugin list` sorts by name, so it cannot show the order; this can. Expect seven lines, ctx-info last:
 
 ```
 hooks module filetree@claude-code-filetree loaded (worker, environment 1
@@ -117,10 +118,10 @@ hooks module cache@claude-mods loaded (worker, environment 3
 hooks module cache-warmer@claude-mods loaded (worker, environment 4
 hooks module launch-codes@claude-mods loaded (worker, environment 5
 hooks module usage@claude-mods loaded (worker, environment 6
-hooks module usage-quota@claude-mods loaded (worker, environment 7
+hooks module ctx-info@claude-mods loaded (worker, environment 7
 ```
 
-The middle five may be in any order. If a line is missing, install that mod. If usage-quota is not last, nothing is hidden, but the context band is not at the bottom of the band: `claude plugin uninstall usage-quota@claude-mods` then step 6 moves it there. Any line naming `claude-code-mods` or `claude-code-usage-quota-mod` is an original that step 3 should have removed.
+The middle five may be in any order. If a line is missing, install that mod. If ctx-info is not last, nothing is hidden, but the context band is not at the bottom of the band: `claude plugin uninstall ctx-info@claude-mods` then step 6 moves it there. Any line naming `claude-code-mods` or `claude-code-usage-quota-mod` is an original that step 3 should have removed.
 
 ### 8. Load them and check them
 
@@ -132,7 +133,7 @@ Restart the desktop app, or start a new session (in an open session, `/reload-pl
 | `/credits` | `Plan: 5-hour …% (resets in …) · weekly …% (resets in …)`, then `Usage credits: $… left · …` |
 | `/warmer` | `Cache warmer on · …` |
 | `/cache` | the countdown line as text |
-| `/quota` | `Context band off.`, and again to turn it back on |
+| `/ctx-info` | `Context band off.`, and again to turn it back on |
 | `/subagents` | the Agents pane opens |
 
 And on screen, after sending any message:
@@ -147,5 +148,5 @@ The first time a new mod loads, the desktop app may ask whether to allow it. All
 
 - **Updating this repo's mods**: `git pull` in this folder, then `/reload-plugins` in open sessions.
 - **Updating filetree**: `claude plugin marketplace update claude-code-filetree` then `claude plugin update filetree@claude-code-filetree`.
-- **Adding another mod**: install it. To keep the context band at the bottom of the band, reinstall usage-quota afterwards (uninstall, then step 6) and check with step 7.
+- **Adding another mod**: install it. To keep the context band at the bottom of the band, reinstall ctx-info afterwards (uninstall, then step 6) and check with step 7.
 - **Removing everything**: `claude plugin uninstall <id>` for each id in the table.

@@ -30,8 +30,8 @@
       "description": "The plan's 5-hour and weekly use and your usage credits (the pool Fable draws on) on the status line under the prompt, refreshed from the session and your account."
     },
     {
-      "name": "usage-quota",
-      "source": "./mods/usage-quota",
+      "name": "ctx-info",
+      "source": "./mods/ctx-info",
       "description": "A compact context band above the prompt: context use with its breakdown, one-click Compact and per-session Auto compact. Fork of Anant Raghunath's usage-quota without the 5-hour and weekly meters (the usage mod shows those) and without polling."
     },
     {

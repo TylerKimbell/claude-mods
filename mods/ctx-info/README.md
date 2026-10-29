@@ -1,4 +1,4 @@
-# usage-quota (fork): the context band
+# ctx-info: the context band (a usage-quota fork)
 
 A compact band above the prompt for the context window:
 
@@ -12,7 +12,7 @@ Messages 419k   Tools 39k   Other 18k
 - **Compact** runs `/compact` in one click.
 - **Auto compact** compacts between turns once the context reaches your % (30% by default, 15 to 99), never mid-reply. Each session keeps its own setting; a new session starts with it off. If the context is already past your % when you turn it on (or you lower the %), it asks `Now` or `After my next compact`: `Now` compacts at once; `After my next compact` holds auto compact off until the next compaction, however it happens (the Compact button, `/compact`, or Claude Code's own), and from then on it acts as usual. Leaving the question unanswered counts as `After my next compact`.
 - **▼ / ▲** collapses the band to the summary row and the bar. The setting is shared by every session.
-- `/quota` turns the band off and on.
+- `/ctx-info` turns the band off and on.
 
 This is a fork of [Anant Raghunath's usage-quota](https://github.com/anantraghunath/claude-code-usage-quota-mod) 0.1.6 (MIT). The changes:
 
@@ -31,7 +31,7 @@ All local: `$.session.usage()` for the window and its breakdown, the free estima
 At the prompt of a terminal `claude` session:
 
 ```
-/plugin install usage-quota --marketplace TylerKimbell/claude-mods
+/plugin install ctx-info --marketplace TylerKimbell/claude-mods
 ```
 
 In the desktop app: **+** next to the prompt, **Plugins**, **Add marketplace** with `TylerKimbell/claude-mods`, then **Add plugin**. Uninstall `usage-quota@claude-code-usage-quota-mod` first if it is installed.

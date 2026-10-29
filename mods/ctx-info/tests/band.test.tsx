@@ -94,7 +94,7 @@ test('draws the context band: the summary beside the controls, the bar, the brea
   await $.session.measure(MEASURE)
 
   for (const surface of SURFACES) {
-    const ui = await $.ui.mount({ plugin: 'usage-quota', surface, component: 'AbovePrompt', props: PROPS })
+    const ui = await $.ui.mount({ plugin: 'ctx-info', surface, component: 'AbovePrompt', props: PROPS })
     expect(await ui.find({ type: 'Text', text: 'Context' })).toBeDefined()
     expect(await ui.find({ text: '16% used' })).toBeDefined()
     expect(await ui.find({ text: '809k free of 1M' })).toBeDefined()
@@ -146,7 +146,7 @@ test('shows a refresh failure in the status line', async ($, on) => {
   on('session.usage', () => ({ deny: 'no session' }))
   answerRest(on, status)
   await $.session.measure(MEASURE)
-  expect(status).toContainEqual(expect.stringMatching(/^usage-quota: (?!usage-quota).*no session/))
+  expect(status).toContainEqual(expect.stringMatching(/^ctx-info: (?!ctx-info).*no session/))
 })
 
 test('the Compact button runs /compact', async ($, on) => {
@@ -162,7 +162,7 @@ test('the Compact button runs /compact', async ($, on) => {
   await $.session.measure(MEASURE)
 
   for (const surface of SURFACES) {
-    const ui = await $.ui.mount({ plugin: 'usage-quota', surface, component: 'AbovePrompt', props: PROPS })
+    const ui = await $.ui.mount({ plugin: 'ctx-info', surface, component: 'AbovePrompt', props: PROPS })
     await ui.press({ key: 'compact' })
     await clock.advance(1)
     await ui.unmount()
@@ -183,13 +183,13 @@ test('the exact /context count corrects the estimate, and Messages with it', asy
     return { value: u }
   })
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
-  on('command.register', () => ({ value: { command: 'quota' } }))
+  on('command.register', () => ({ value: { command: 'ctx-info' } }))
   answerRest(on, [])
   await $.session.start({ cwd: '.', surface: 'desktop', isInteractive: true })
   await clock.advance(2_000)
 
   for (const surface of SURFACES) {
-    const ui = await $.ui.mount({ plugin: 'usage-quota', surface, component: 'AbovePrompt', props: PROPS })
+    const ui = await $.ui.mount({ plugin: 'ctx-info', surface, component: 'AbovePrompt', props: PROPS })
     // Tools 20k + 13k, exact; Other 11k; Messages 158k - 33k - 11k = 114k
     expect(await ui.find({ type: 'Text', text: '33k' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: '11k' })).toBeDefined()
@@ -214,7 +214,7 @@ test('after /compact, before any reply, the exact count is shown', async ($, on)
   await clock.advance(1)
 
   for (const surface of SURFACES) {
-    const ui = await $.ui.mount({ plugin: 'usage-quota', surface, component: 'AbovePrompt', props: PROPS })
+    const ui = await $.ui.mount({ plugin: 'ctx-info', surface, component: 'AbovePrompt', props: PROPS })
     // Messages 23k exact; used 23k + 51k + 11k = 85k; free 1M - 85k - 33k buffer
     expect(await ui.find({ type: 'Text', text: '23k' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: '882k free of 1M' })).toBeDefined()
@@ -234,7 +234,7 @@ function startWorld(on: On, percentRef: { value: number; isCompacted?: boolean }
     return { value: { ...u, context: { ...u.context, tokens, percent: percentRef.value } } }
   })
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
-  on('command.register', () => ({ value: { command: 'quota' } }))
+  on('command.register', () => ({ value: { command: 'ctx-info' } }))
   on('command.run', (_$, e) => {
     ran.push(e.command)
     return { text: '' }
@@ -263,7 +263,7 @@ test('the arrow collapses the band to the summary and the bar, and back', async 
   await $.session.start({ cwd: '.', surface: 'desktop', isInteractive: true })
 
   for (const surface of SURFACES) {
-    const ui = await $.ui.mount({ plugin: 'usage-quota', surface, component: 'AbovePrompt', props: PROPS })
+    const ui = await $.ui.mount({ plugin: 'ctx-info', surface, component: 'AbovePrompt', props: PROPS })
     expect(await ui.find({ type: 'Button', label: '▼' })).toBeDefined()
     expect(await ui.find({ text: 'Messages' })).toBeDefined()
     await ui.press({ key: 'collapse' })
@@ -283,7 +283,7 @@ test('collapsed is one setting for every chat: another chat collapsing shows her
   const shared: Record<string, unknown> = {}
   const clock = startWorld(on, { value: 16 }, [], [], 'Compact now', shared)
   await $.session.start({ cwd: '.', surface: 'desktop', isInteractive: true })
-  const ui = await $.ui.mount({ plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  const ui = await $.ui.mount({ plugin: 'ctx-info', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   expect(await ui.find({ type: 'Button', label: '▼' })).toBeDefined()
   // the other chat's press, in the store all chats share
   shared.collapsed = true
@@ -301,7 +301,7 @@ test('auto compact: the switch shows the field, and it compacts between turns on
   const clock = startWorld(on, percent, ran)
   await $.session.start({ cwd: '.', surface: 'desktop', isInteractive: true })
 
-  const ui = await $.ui.mount({ plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  const ui = await $.ui.mount({ plugin: 'ctx-info', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   expect(await ui.find({ type: 'Input' })).toBeUndefined()
   await ui.press({ key: 'auto' })
   expect((await ui.find({ type: 'Svg', alt: 'Auto compact on' }))).toBeDefined()
@@ -376,7 +376,7 @@ test('auto compact set below the context asks in the band, and "Now" compacts', 
   const clock = startWorld(on, percent, ran, asked, 'Compact now')
   await $.session.start({ cwd: '.', surface: 'desktop', isInteractive: true })
 
-  const ui = await $.ui.mount({ plugin: 'usage-quota', surface: 'terminal', component: 'AbovePrompt', props: PROPS })
+  const ui = await $.ui.mount({ plugin: 'ctx-info', surface: 'terminal', component: 'AbovePrompt', props: PROPS })
   await ui.press({ key: 'auto' })
   await ui.input({ key: await fieldKey(ui), text: '40' })
   await clock.advance(1_100)
@@ -397,7 +397,7 @@ test('"After my next compact" holds through a % flickering below, until a real c
   const clock = startWorld(on, percent, ran)
   await $.session.start({ cwd: '.', surface: 'desktop', isInteractive: true })
 
-  const ui = await $.ui.mount({ plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  const ui = await $.ui.mount({ plugin: 'ctx-info', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   await ui.press({ key: 'auto' })
   await ui.input({ key: await fieldKey(ui), text: '19' })
   expect(await ui.find({ type: 'Text', text: /already at/ })).toBeUndefined()
@@ -439,7 +439,7 @@ test('auto compact is per chat: another chat opens with it off, at 30%; turned o
   await clock.advance(3_000)
   expect(ran).toEqual([])
 
-  const ui = await $.ui.mount({ plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  const ui = await $.ui.mount({ plugin: 'ctx-info', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   expect(await ui.find({ type: 'Svg', alt: 'Auto compact off' })).toBeDefined()
   await ui.press({ key: 'auto' })
   expect((await ui.find({ type: 'Input' }))?.props.value).toBe('30')
@@ -470,7 +470,7 @@ test('auto compact tries again while the turn is still winding down', async ($, 
     return { value: { ...u, context: { ...u.context, tokens: percent.value * 10_000, percent: percent.value } } }
   })
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
-  on('command.register', () => ({ value: { command: 'quota' } }))
+  on('command.register', () => ({ value: { command: 'ctx-info' } }))
   // the direct way refused once: /compact from then on, refused while the turn winds down, then run
   on('session.compact', () => {
     throw new Error('a turn is running')
@@ -503,7 +503,7 @@ test('a chat opened past the auto compact % compacts at once, as after an app re
     return { value: { ...u, context: { ...u.context, tokens: percent.value * 10_000, percent: percent.value } } }
   })
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
-  on('command.register', () => ({ value: { command: 'quota' } }))
+  on('command.register', () => ({ value: { command: 'ctx-info' } }))
   on('session.compact', () => {
     ran.push('compact')
     percent.value = 8
@@ -526,7 +526,7 @@ test('where the session cannot compact directly (the desktop app), auto compact 
     return { value: { ...u, context: { ...u.context, tokens: percent.value * 10_000, percent: percent.value } } }
   })
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
-  on('command.register', () => ({ value: { command: 'quota' } }))
+  on('command.register', () => ({ value: { command: 'ctx-info' } }))
   on('session.compact', () => {
     throw new Error('$.session.compact: not available in a headless (-p / SDK) session yet')
   })
@@ -547,7 +547,7 @@ test('a narrow chat stacks the band, nothing cut off or dropped', async ($, on) 
   startWorld(on, { value: 16 }, [])
   await $.session.start({ cwd: '.', surface: 'desktop', isInteractive: true })
   for (const surface of SURFACES) {
-    const ui = await $.ui.mount({ plugin: 'usage-quota', surface, component: 'AbovePrompt', props: { ...PROPS, bodyColumns: 38 } })
+    const ui = await $.ui.mount({ plugin: 'ctx-info', surface, component: 'AbovePrompt', props: { ...PROPS, bodyColumns: 38 } })
     for (const text of ['Context', 'Messages', 'Tools', 'Other']) expect(await ui.find({ text })).toBeDefined()
     expect(await ui.find({ type: 'Button', label: 'Compact' })).toBeDefined()
     await ui.press({ key: 'collapse' })
@@ -568,7 +568,7 @@ test('the desktop in light mode draws in the light palette', async ($, on) => {
   on('fs.read', () => (reads++, { value: JSON.stringify({ userThemeMode: 'light' }) }) as never)
   await $.session.start({ cwd: '.', surface: 'desktop', isInteractive: true })
   await clock.advance(2_000)
-  const ui = await $.ui.mount({ plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  const ui = await $.ui.mount({ plugin: 'ctx-info', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   // green text a shade deeper than the green bars, to read on the pale band
   expect((await ui.find({ type: 'Text', text: '16% used' }))?.props.color).toBe('#16a34a')
   const before = reads
@@ -580,20 +580,29 @@ test('the desktop in light mode draws in the light palette', async ($, on) => {
   await ui.unmount()
 })
 
-test('the settings saved under the old plugin name are copied over once, never over newer ones', async ($, on) => {
+test('the settings saved under an old plugin name are copied over once, never over newer ones', async ($, on) => {
   const clock = startWorld(on, { value: 10 }, [], [], 'Compact now', { collapsed: false })
   on('env.get', (_$, e) => ({ value: (e as unknown as { name: string }).name === 'HOME' ? '/home/me' : undefined }) as never)
   const listed: string[] = []
+  // This mod's own store from when it was usage-quota wins over the upstream one, newer as that is.
   on('fs.list', (_$, e) => {
     listed.push(String((e as unknown as { path: string }).path))
-    return { value: [{ name: 'claude-code-usage-quota_claude-code-usage-quota-mod-abc123.json', kind: 'file', size: 10, mtimeMs: 1, isLink: false }] } as never
+    return {
+      value: [
+        { name: 'usage-quota_claude-mods-def456.json', kind: 'file', size: 10, mtimeMs: 1, isLink: false },
+        { name: 'claude-code-usage-quota_claude-code-usage-quota-mod-abc123.json', kind: 'file', size: 10, mtimeMs: 2, isLink: false },
+      ],
+    } as never
   })
-  on('fs.read', () => ({ value: JSON.stringify({ 'autoCompact:chat': { isOn: true, at: 40 }, collapsed: true }) }) as never)
+  on('fs.read', (_$, e) => {
+    const at = String((e as unknown as { path: string }).path).includes('usage-quota_claude-mods-') ? 40 : 70
+    return { value: JSON.stringify({ 'autoCompact:chat': { isOn: true, at }, collapsed: true }) } as never
+  })
   await $.session.start({ cwd: '.', surface: 'desktop', isInteractive: true })
   await clock.advance(3_000)
   // the host gives the path in the platform's own form
   expect(listed).toEqual([expect.stringMatching(/home[\\/]me[\\/]\.claude[\\/]plugins[\\/]store$/)])
-  const ui = await $.ui.mount({ plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  const ui = await $.ui.mount({ plugin: 'ctx-info', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   expect(await ui.find({ type: 'Svg', alt: 'Auto compact on' })).toBeDefined()
   expect((await ui.find({ type: 'Input' }))?.props.value).toBe('40')
   // collapsed was already set here: kept as it is (expanded: the breakdown shows)
@@ -614,7 +623,7 @@ test('Context turns amber from 50% and red from 80%', async ($, on) => {
     state.percent = percent
     await clock.advance(1_000)
     await $.session.measure(MEASURE)
-    const ui = await $.ui.mount({ plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+    const ui = await $.ui.mount({ plugin: 'ctx-info', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
     expect((await ui.find({ type: 'Text', text: `${percent}% used` }))?.props.color).toBe(color)
     await ui.unmount()
   }
@@ -631,7 +640,7 @@ test('passes the band on: a mod beneath draws under the context block', async ($
   on('ui.render', () => ({ type: 'Text', props: {}, children: ['other band'] }) as never)
   await $.session.measure(MEASURE)
   for (const surface of SURFACES) {
-    const ui = await $.ui.mount({ plugin: 'usage-quota', surface, component: 'AbovePrompt', props: PROPS })
+    const ui = await $.ui.mount({ plugin: 'ctx-info', surface, component: 'AbovePrompt', props: PROPS })
     expect(await ui.find({ text: '16% used' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: 'other band' })).toBeDefined()
     const texts = (await ui.findAll({ type: 'Text' })).map(t => t.text)

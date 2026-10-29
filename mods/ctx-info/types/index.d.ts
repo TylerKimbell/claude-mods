@@ -26,7 +26,7 @@ export type Hold = { chat: string; waits: boolean; stuck: boolean }
 
 declare module 'claude-code' {
   interface PluginState {
-    'usage-quota': {
+    'ctx-info': {
       snapshot: Snapshot | null
       isOn: boolean
       isCollapsed: boolean

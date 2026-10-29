@@ -15,6 +15,6 @@ mods/cache
   Fork of cache-clock 0.5.4, Copyright (c) 2026 Ray Amjad
   https://github.com/ray-amjad/claude-code-mods/tree/main/plugins/cache-clock
 
-mods/usage-quota
+mods/ctx-info
   Fork of usage-quota 0.1.6, Copyright (c) 2026 Anant Raghunath
   https://github.com/anantraghunath/claude-code-usage-quota-mod
