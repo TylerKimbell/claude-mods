@@ -1,7 +1,7 @@
 {
   "name": "agent-progress",
   "version": "0.1.0",
-  "description": "A progress bar above the prompt for the subagents Claude starts, and an Agents pane with each one's model, step progress, context, estimated cost and time. Based on Barncore's agent-watch and johnnyvizz's savvy-progress (MIT).",
+  "description": "A progress bar above the prompt for Claude's own work and the subagents it starts, and an Agents pane with each one's model, step progress, context, estimated cost and time. Based on Barncore's agent-watch and johnnyvizz's savvy-progress (MIT).",
   "license": "MIT",
   "types": "./types/index.d.ts",
   "userConfig": {

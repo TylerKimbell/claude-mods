@@ -11,7 +11,7 @@ Every step is safe to run again on a machine that already has some of this insta
 | # | Plugin id | From | What it is |
 | --- | --- | --- | --- |
 | 1 | `filetree@claude-code-filetree` | data-goblin/claude-code-filetree | Live file tree pane |
-| 2 | `agent-progress@claude-mods` | this repo | Subagent bar and Agents pane |
+| 2 | `agent-progress@claude-mods` | this repo | Claude and subagent bars, Agents pane |
 | 3 | `cache@claude-mods` | this repo | Cache countdown in the status line (our cache-clock fork) |
 | 4 | `cache-warmer@claude-mods` | this repo | Keeps big sessions' cache warm while idle |
 | 5 | `launch-codes@claude-mods` | this repo | Code-and-LAUNCH guard on risky commands and .env edits |
@@ -133,11 +133,11 @@ Restart the desktop app, or start a new session (in an open session, `/reload-pl
 | `/warmer` | `Cache warmer on · …` |
 | `/cache` | the countdown line as text |
 | `/quota` | `Context band off.`, and again to turn it back on |
-| `/agents` | the Agents pane opens |
+| `/subagents` | the Agents pane opens |
 
 And on screen, after sending any message:
 
-- The band above the prompt is the context band: `Context …% used  …k free of 1M` with Auto compact, Compact and ▼ beside it, the context bar, and a `Messages · Tools · Other` row. agent-progress's subagent bar joins the band whenever Claude runs subagents.
+- The band above the prompt is the context band: `Context …% used  …k free of 1M` with Auto compact, Compact and ▼ beside it, the context bar, and a `Messages · Tools · Other` row. agent-progress's `Claude` bar sits beneath it, and its subagent bar joins whenever Claude runs subagents.
 - The status line under the prompt has `launch-codes on`, `cache ◷ 59:… left · 1h ttl` and `usage 5h …% · Weekly …% · $… left`, all on one row with no `+1` fold.
 - A Files tab (filetree) sits beside the chat.
 

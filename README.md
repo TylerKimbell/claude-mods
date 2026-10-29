@@ -32,7 +32,7 @@ Requires Claude Code 2.1.287 or later. A private repo installs only for people w
 
 | Mod | What it does |
 | --- | --- |
-| [`agent-progress`](mods/agent-progress/README.md) | A progress bar above the prompt for the subagents Claude starts, and an Agents pane with each one's model, step progress, context, estimated cost and time. `/agents` toggles the pane. |
+| [`agent-progress`](mods/agent-progress/README.md) | A progress bar above the prompt for Claude's own work and the subagents it starts, and an Agents pane with each one's model, step progress, context, estimated cost and time. `/subagents` toggles the pane. |
 | [`cache`](mods/cache/README.md) | `cache ◷ 59:43 left · 1h ttl` in the status line under the prompt: a countdown until the prompt cache goes cold. A fork of Ray Amjad's cache-clock that also restarts the clock on cache-warmer's pings, with the handoff note off by default, moved out of the band and renamed to keep the entry short. `/cache` prints it. |
 | [`cache-warmer`](mods/cache-warmer/README.md) | Keeps a big session's prompt cache warm while you are away: a cheap tool-less request over the cached transcript a few minutes before expiry, once per cache lifetime, capped at 4 idle hours and skipped under 100k tokens. `/warmer` shows pings, cost and what a cold return would have cost. |
 | [`launch-codes`](mods/launch-codes/README.md) | Risky Bash and PowerShell commands (rm -rf, force push, reset --hard, DROP TABLE, curl piped into sh, disk formats) and `.env` edits need a 4-character code typed by you, then a LAUNCH. `/launch-codes test <command>` checks a command; `/launch-codes off` and `on`, typed by you, switch it off and on for the current session; the status line says which. |

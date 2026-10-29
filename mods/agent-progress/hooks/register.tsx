@@ -5,13 +5,18 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { AgentRun, Bar, Panel } from '../types'
+import type { AgentRun, Bar, Panel, PlanStep, Work } from '../types'
 
 const PANE = 'agent-progress'
 const STEP_TOOL = 'mcp__agent-progress__step'
+// Claude's own task list: the desktop app's plan tools, and the CLI's.
+const PLAN_TOOL = 'mcp__ccd_turn__update_plan'
+const WRAP_TOOL = 'mcp__ccd_turn__wrap_up'
+const TASK_TOOLS = new Set([PLAN_TOOL, WRAP_TOOL, 'TodoWrite', 'TaskCreate', 'TaskUpdate'])
 export const FLUSH_MS = 5_000
 
 const bar = atom({ plugin: 'agent-progress', key: 'bar' } as const, null as Bar | null)
+const main = atom({ plugin: 'agent-progress', key: 'main' } as const, { steps: [], turn: 0, planTurn: -1, isWorking: false } as Work)
 const agents = atom({ plugin: 'agent-progress', key: 'agents' } as const, [] as AgentRun[])
 const panel = atom({ plugin: 'agent-progress', key: 'panel' } as const, {
   isCompact: false,
@@ -97,53 +102,179 @@ const ratio = (b: Bar): number => (b.isFinished ? 1 : b.total ? b.done / b.total
 
 const barLabel = (b: Bar): string => (b.isFinished ? 'Done' : `${b.done}/${b.total}`)
 
-/** The run's own progress when it reports steps; a finished run is full; else null. */
-const progressOf = (a: AgentRun): number | null => {
-  if (a.status === 'done') return 1
-  if (a.stepTotal) return Math.min(1, (a.stepDone ?? 0) / a.stepTotal)
-  return null
-}
-
 const ctxOf = (a: AgentRun): number => (a.contextMax ? Math.min(100, Math.round((a.contextTokens / a.contextMax) * 100)) : 0)
-
-const textBar = (fraction: number, width: number): string => {
-  const filled = Math.round(width * Math.max(0, Math.min(1, fraction)))
-  return '█'.repeat(filled) + '░'.repeat(Math.max(0, width - filled))
-}
 
 const xml = (s: string): string => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] ?? c)
 
 // ---------------------------------------------------------------------------
-// The band's row on the desktop: one SVG, since the desktop wraps sibling elements.
+// Segmented bars: one segment per step in the pane, one per subagent in the band. Finished
+// segments are solid, the ones under way pulse, and a run that reports no steps sends a wave
+// across all of them.
+
+export type Segments = { count: number; filled: number; live: number; isWave: boolean }
+
+const MAX_SEGMENTS = 12
+const WAVE = 10
+
+/** `done` of `total` with `live` under way, scaled down to MAX_SEGMENTS when there are more. */
+export const segmentsOf = (done: number, total: number, live: number): Segments => {
+  const count = Math.max(1, Math.min(total, MAX_SEGMENTS))
+  const at = (n: number) => Math.round((count * Math.min(n, total)) / Math.max(1, total))
+  const filled = at(done)
+  const pulsing = live > 0 ? Math.min(count - filled, Math.max(1, at(done + live) - filled)) : 0
+  return { count, filled, live: pulsing, isWave: false }
+}
+
+const runSegments = (a: AgentRun): Segments => {
+  if (a.stepTotal) return segmentsOf(a.status === 'done' ? a.stepTotal : (a.stepDone ?? 0), a.stepTotal, a.status === 'running' ? 1 : 0)
+  if (a.status === 'done') return segmentsOf(WAVE, WAVE, 0)
+  if (a.status === 'failed') return segmentsOf(0, WAVE, 0)
+  return { count: WAVE, filled: 0, live: 0, isWave: true }
+}
+
+const bandSegments = (b: Bar): Segments => (b.isFinished ? segmentsOf(b.total, b.total, 0) : segmentsOf(b.done, b.total, b.running))
+
+const SEG_GAP = 3
+const SEG_STYLE = `.k{fill:#e4e4e2}@media (prefers-color-scheme: dark){.k{fill:#2c2c2c}}
+.live{opacity:.45;animation:p 1.6s ease-in-out infinite}@keyframes p{50%{opacity:.2}}
+.wave{opacity:.15;animation:w 1.4s ease-in-out infinite}@keyframes w{30%{opacity:.7}}
+@media (prefers-reduced-motion: reduce){.live,.wave{animation:none}}`
+
+const segmentRects = (s: Segments, color: string, W: number, h: number): string => {
+  const w = (W - SEG_GAP * (s.count - 1)) / s.count
+  return Array.from({ length: s.count }, (_, i) => {
+    const rect = `x="${(i * (w + SEG_GAP)).toFixed(1)}" width="${w.toFixed(1)}" height="${h}" rx="2"`
+    if (i < s.filled) return `<rect ${rect} fill="${color}"/>`
+    if (s.isWave) return `<rect ${rect} fill="${color}" class="wave" style="animation-delay:${(i * 0.12).toFixed(2)}s"/>`
+    if (i < s.filled + s.live) return `<rect ${rect} fill="${color}" class="live"/>`
+    return `<rect ${rect} class="k"/>`
+  }).join('')
+}
+
+const SEG_H = 8
+
+const segmentsSvg = (s: Segments, color: string, W: number): string =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${SEG_H}" viewBox="0 0 ${W} ${SEG_H}"><style>${SEG_STYLE}</style>${segmentRects(s, color, W, SEG_H)}</svg>`
+
+/** The terminal's segments: runs of heavy rules a space apart, split into the coloured and the dim. */
+export const segmentText = (s: Segments, width: number): [string, string] => {
+  const seg = '━'.repeat(Math.max(1, Math.floor((width - (s.count - 1)) / s.count)))
+  const lit = Array(s.filled).fill(seg).join(' ')
+  const dim = Array(s.count - s.filled).fill(seg).join(' ')
+  return [lit && dim ? lit + ' ' : lit, dim]
+}
+
+// ---------------------------------------------------------------------------
+// Claude's own task list, followed from the task tools' calls.
+
+type Status = PlanStep['status']
+type Item = { content?: unknown; subject?: unknown; status?: unknown }
+
+const statusOf = (s: unknown): Status => (s === 'in_progress' || s === 'completed' ? s : 'pending')
+
+const stepsOf = (items: unknown): PlanStep[] =>
+  (items as Item[]).map(i => ({ text: String(i?.content ?? i?.subject ?? ''), status: statusOf(i?.status) }))
+
+/** The task list after one of Claude's task tools ran; null when the call changes nothing. */
+export const planAfter = (steps: PlanStep[], tool: string, input: Record<string, unknown>, result: unknown): PlanStep[] | null => {
+  switch (tool) {
+    case PLAN_TOOL: {
+      if (Array.isArray(input.items)) return stepsOf(input.items)
+      const next = steps.map(s => ({ ...s }))
+      if (input.advance === true) {
+        const at = next.findIndex(s => s.status === 'in_progress')
+        if (at >= 0) next[at]!.status = 'completed'
+        const following = next.findIndex(s => s.status === 'pending')
+        if (following >= 0) next[following]!.status = 'in_progress'
+      }
+      if (Array.isArray(input.done)) for (const n of input.done) if (next[Number(n) - 1]) next[Number(n) - 1]!.status = 'completed'
+      if (typeof input.start === 'number' && next[input.start - 1]) next[input.start - 1]!.status = 'in_progress'
+      return next
+    }
+    // Wrapping up checks the list off.
+    case WRAP_TOOL:
+      return steps.length ? steps.map(s => ({ ...s, status: 'completed' as const })) : null
+    case 'TodoWrite':
+      return Array.isArray(input.todos) ? stepsOf(input.todos) : null
+    case 'TaskCreate': {
+      const id = (result as { task?: { id?: string } } | undefined)?.task?.id
+      return [...steps, { id, text: String(input.subject ?? ''), status: 'pending' }]
+    }
+    case 'TaskUpdate':
+      if (input.status === 'deleted') return steps.filter(s => s.id !== input.taskId)
+      return steps.map(s =>
+        s.id === input.taskId
+          ? { ...s, status: input.status === undefined ? s.status : statusOf(input.status), text: typeof input.subject === 'string' ? input.subject : s.text }
+          : s,
+      )
+  }
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// The band's rows: Claude's own, always, and the subagents' while there is a burst.
+
+type Row = { title: string; segs: Segments; color: string; isLive: boolean; end: string; alt: string }
+
+const mainRow = (w: Work): Row => {
+  const steps = w.planTurn === w.turn ? w.steps : []
+  if (steps.length) {
+    const done = steps.filter(s => s.status === 'completed').length
+    const current = steps.find(s => s.status === 'in_progress')
+    const isDone = done === steps.length
+    const title = `Claude${isDone ? ' done' : ''} ${done}/${steps.length}`
+    const end = isDone ? '' : ((current ?? steps.find(s => s.status === 'pending'))?.text ?? '')
+    return {
+      title,
+      segs: segmentsOf(done, steps.length, w.isWorking && current ? 1 : 0),
+      color: isDone ? DONE : ACCENT,
+      isLive: w.isWorking,
+      end,
+      alt: end ? `${title}: ${end}` : title,
+    }
+  }
+  if (w.isWorking) return { title: 'Claude working', segs: { count: WAVE, filled: 0, live: 0, isWave: true }, color: ACCENT, isLive: true, end: '', alt: 'Claude working' }
+  if (w.turn > 0) return { title: 'Claude done', segs: segmentsOf(WAVE, WAVE, 0), color: DONE, isLive: false, end: '', alt: 'Claude done' }
+  return { title: 'Claude ready', segs: segmentsOf(0, WAVE, 0), color: ACCENT, isLive: false, end: '', alt: 'Claude ready' }
+}
+
+const subagentRow = (b: Bar): Row => {
+  const percent = `${Math.round(ratio(b) * 100)}%`
+  return {
+    title: b.isFinished ? 'Subagents done' : `Subagents ${b.done}/${b.total}${b.running ? ` · ${b.running} running` : ''}`,
+    segs: bandSegments(b),
+    color: b.isFinished ? DONE : ACCENT,
+    isLive: !b.isFinished && b.running > 0,
+    end: percent,
+    alt: `Subagents: ${barLabel(b)}, ${percent}`,
+  }
+}
+
+// On the desktop each row is one SVG, since the desktop wraps sibling elements.
 
 const H = 22
-const BAR_H = 12
+const BAR_H = 10
+const CHAR_W = 6.8
 
-const rowSvg = (b: Bar, W: number): string => {
-  const title = b.isFinished ? 'Subagents done' : `Subagents ${b.done}/${b.total}${b.running ? ` · ${b.running} running` : ''}`
-  const titleW = Math.round(title.length * 7.2)
+const rowSvg = (r: Row, W: number): string => {
+  const titleW = Math.round(r.title.length * 7.2)
   const BAR_X = 16 + titleW + 12
-  const BAR_W = Math.max(60, W - BAR_X - 48)
-  const color = b.isFinished ? DONE : ACCENT
+  // The end text takes at most 40% of the row; a longer step name is cut short.
+  const room = Math.max(4, Math.floor((W * 0.4) / CHAR_W))
+  const end = r.end.length > room ? r.end.slice(0, room - 1) + '…' : r.end
+  const BAR_W = Math.max(60, W - BAR_X - (end ? Math.round(end.length * CHAR_W) + 16 : 4))
   const y0 = (H - BAR_H) / 2
-  const fillW = Math.round(BAR_W * ratio(b))
-  const runW = b.total ? Math.round((BAR_W * Math.min(b.total, b.done + b.running)) / b.total) : 0
-  const percent = `${Math.round(ratio(b) * 100)}%`
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
 <style>
-.t{fill:#1f1f1f}.m{fill:#8a8a8a}.k{fill:#e4e4e2}
-@media (prefers-color-scheme: dark){.t{fill:#ececec}.m{fill:#9a9a9a}.k{fill:#2c2c2c}}
-.live{animation:p 1.6s ease-in-out infinite}@keyframes p{50%{opacity:.35}}
-@media (prefers-reduced-motion: reduce){.live{animation:none}}
+.t{fill:#1f1f1f}.m{fill:#8a8a8a}
+@media (prefers-color-scheme: dark){.t{fill:#ececec}.m{fill:#9a9a9a}}
+${SEG_STYLE}
+.dot{animation:p 1.6s ease-in-out infinite}@media (prefers-reduced-motion: reduce){.dot{animation:none}}
 </style>
-<circle cx="5" cy="${H / 2}" r="4" fill="${color}"${b.isFinished || !b.running ? '' : ' class="live"'}/>
-<text class="t" x="16" y="${H / 2 + 4.5}" font-family="${FONT}" font-size="13" font-weight="500">${xml(title)}</text>
-<g transform="translate(${BAR_X},${y0})">
-<rect class="k" width="${BAR_W}" height="${BAR_H}" rx="${BAR_H / 2}"/>
-<rect width="${runW}" height="${BAR_H}" rx="${BAR_H / 2}" fill="${color}" opacity="0.3"/>
-<rect width="${fillW}" height="${BAR_H}" rx="${BAR_H / 2}" fill="${color}"/>
-</g>
-<text class="m" x="${W - 4}" y="${H / 2 + 4.5}" text-anchor="end" font-family="${FONT}" font-size="12.5" font-variant-numeric="tabular-nums">${percent}</text>
+<circle cx="5" cy="${H / 2}" r="4" fill="${r.color}"${r.isLive ? ' class="dot"' : ''}/>
+<text class="t" x="16" y="${H / 2 + 4.5}" font-family="${FONT}" font-size="13" font-weight="500">${xml(r.title)}</text>
+<g transform="translate(${BAR_X},${y0})">${segmentRects(r.segs, r.color, BAR_W, BAR_H)}</g>
+<text class="m" x="${W - 4}" y="${H / 2 + 4.5}" text-anchor="end" font-family="${FONT}" font-size="12.5" font-variant-numeric="tabular-nums">${xml(end)}</text>
 </svg>`
 }
 
@@ -245,13 +376,32 @@ export const register: Register = (on, options) => {
       isDeferred: false,
     })
     await $.command.register({
-      name: 'agents',
+      name: 'subagents',
       description: 'Show or hide the Agents pane: running and finished subagents with model, progress, context, cost and time',
     })
     return started
   })
 
-  on('command.run', { command: 'agents' }, async $ => {
+  // --- Claude's own row: its turns, and its task list as the task tools change it.
+  on('turn.start', async ($, e, next) => {
+    if (!e.agentId) await update($, main, w => ({ ...w, turn: w.turn + 1, isWorking: true }))
+    return next(e)
+  })
+
+  on('tool.call', async ($, e, next) => {
+    const answered = await next(e)
+    if (e.agentId || !TASK_TOOLS.has(e.tool) || answered.deny !== undefined || answered.isError) return answered
+    await update($, main, w => {
+      // A list left unfinished carries into the next turn; a finished one starts over.
+      const base = w.planTurn === w.turn || w.steps.some(s => s.status !== 'completed') ? w.steps : []
+      if (e.tool === WRAP_TOOL && w.planTurn !== w.turn) return w
+      const steps = planAfter(base, e.tool, e as unknown as Record<string, unknown>, answered.result)
+      return steps ? { ...w, steps, planTurn: w.turn } : w
+    })
+    return answered
+  })
+
+  on('command.run', { command: 'subagents' }, async $ => {
     const isOpen = await togglePane($)
     return { text: isOpen ? 'Agents pane opened.' : 'Agents pane closed.' }
   })
@@ -329,6 +479,7 @@ export const register: Register = (on, options) => {
 
   on('turn.complete', async ($, e, next) => {
     const agentId = e.agentId
+    if (!agentId) await update($, main, w => ({ ...w, isWorking: false }))
     if (agentId) {
       // The run's last requests land before it is marked done.
       await flush($, ticker)
@@ -360,18 +511,12 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  // A finished bar has been seen once the person writes again.
-  on('prompt.submit', async ($, e, next) => {
-    if (e.origin.kind !== 'plugin') {
-      const b = await read($, bar)
-      if (b?.isFinished) await update($, bar, () => null)
-    }
-    return next(e)
-  })
-
   // --- the Agents pane
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text, Button } = $.ui.resolve(e)
+    const ui = $.ui.resolve(e)
+    const { Box, Text, Button } = ui
+    // The terminal draws the bars in text; every other surface gets an SVG per row.
+    const Svg = e.surface !== 'terminal' && 'Svg' in ui ? ui.Svg : undefined
     const list = await read($, agents)
     const p = await read($, panel)
     const at = Math.max(await $.clock.now(), ...list.map(a => a.startedAt), 0)
@@ -380,6 +525,8 @@ export const register: Register = (on, options) => {
     const t = totals(list, at)
     const cols = Math.max(24, e.props.bodyColumns || 40)
     const barW = Math.max(6, Math.min(24, cols - 30))
+    // About 8 CSS px per reported column, less the row's indent.
+    const svgW = Math.max(120, Math.min(640, cols * 8 - 24))
 
     const toggleCompact = (
       <Button key="compact" label={p.isCompact ? 'Expand' : 'Collapse'} plain onPress={() => update($, panel, prev => ({ ...prev, isCompact: !prev.isCompact }))} />
@@ -395,11 +542,32 @@ export const register: Register = (on, options) => {
 
     const row = (a: AgentRun) => {
       const ctx = ctxOf(a)
-      const progress = progressOf(a)
+      const segs = runSegments(a)
       const color = a.status === 'failed' ? FAILED : a.status === 'done' ? DONE : ACCENT
       const glyph = a.status === 'running' ? '●' : a.status === 'done' ? '✓' : '✗'
       const model = a.effort ? `${modelName(a.model)} · ${a.effort}` : modelName(a.model)
       const steps = a.stepTotal ? `${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? ' ' + a.stepNote : ''} · ` : ''
+      const meta = `${steps}ctx ${ctx}% · ${fmtTokens(a.tokens)} ≈${fmtCost(a.costUsd)} ${fmtTime(elapsed(a, at))}`
+      const [lit, dim] = segmentText(segs, barW)
+      const bar = Svg
+        ? [
+            <Box key="bar" marginLeft={2}>
+              <Svg source={segmentsSvg(segs, color, svgW)} alt={`${a.description || a.type}: ${steps ? steps.slice(0, -3) : a.status}`} width={svgW} height={SEG_H} />
+            </Box>,
+            <Text key="meta" dimColor wrap="truncate-end">
+              {'  '}
+              {meta}
+            </Text>,
+          ]
+        : [
+            <Text key="bar" wrap="truncate-end">
+              {'  '}
+              <Text color={color}>{lit}</Text>
+              <Text dimColor>
+                {dim} {meta}
+              </Text>
+            </Text>,
+          ]
       return (
         <Box key={a.id} flexDirection="column" marginBottom={1}>
           <Box flexDirection="row" gap={1}>
@@ -412,14 +580,7 @@ export const register: Register = (on, options) => {
             {'  '}
             {a.type} · {model}
           </Text>
-          <Text wrap="truncate-end">
-            {'  '}
-            {progress === null ? <Text dimColor>{textBar(ctx / 100, barW)}</Text> : <Text color={color}>{textBar(progress, barW)}</Text>}
-            <Text dimColor>
-              {' '}
-              {steps}ctx {ctx}% · {fmtTokens(a.tokens)} ≈{fmtCost(a.costUsd)} {fmtTime(elapsed(a, at))}
-            </Text>
-          </Text>
+          {bar}
         </Box>
       )
     }
@@ -453,10 +614,11 @@ export const register: Register = (on, options) => {
     )
   })
 
-  // --- the band above the prompt
+  // --- the band above the prompt: Claude's row always, the subagents' beneath it
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey) return next(e)
     const b = await read($, bar)
-    if (b === null || e.props.hasSurvey) return next(e)
+    const w = await read($, main)
 
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
@@ -464,12 +626,12 @@ export const register: Register = (on, options) => {
     const rest = await next(e).catch(() => Box({ children: [] }))
 
     const list = await read($, agents)
-    const percent = `${Math.round(ratio(b) * 100)}%`
     const crew = <Button key="agent-progress-crew" label={`×${list.length}`} plain onPress={() => void togglePane($)} />
     const dismiss = <Button key="agent-progress-dismiss" label="✕" plain role="dismiss" onPress={() => update($, bar, () => null)} />
-    const alt = `Subagents: ${barLabel(b)}, ${percent}`
+    const rows: [string, Row, unknown[]][] = [['agent-progress-main', mainRow(w), []]]
+    if (b) rows.push(['agent-progress-subagents', subagentRow(b), [crew, dismiss]])
 
-    // The terminal draws the subagent row in text; every other surface gets one SVG.
+    // The terminal draws the rows in text; every other surface gets one SVG per row.
     if (e.surface !== 'terminal' && 'Svg' in ui) {
       const { Svg } = ui
       // About 8 CSS px per reported column; the rest is the count, the dismiss and their gaps.
@@ -477,30 +639,39 @@ export const register: Register = (on, options) => {
       return (
         <Box flexDirection="column">
           {rest}
-          <Box flexDirection="row" alignItems="center" gap={1}>
-            <Svg source={rowSvg(b, width)} alt={alt} width={width} height={H} />
-            {crew}
-            {dismiss}
-          </Box>
+          {rows.map(([key, r, extra]) => (
+            <Box key={key} flexDirection="row" alignItems="center" gap={1}>
+              <Svg source={rowSvg(r, width)} alt={r.alt} width={width} height={H} />
+              {extra}
+            </Box>
+          ))}
         </Box>
       )
     }
 
     const cols = e.props.bodyColumns || 80
     const width = Math.max(6, Math.min(40, cols - 44))
-    const color = b.isFinished ? DONE : ACCENT
     return (
       <Box flexDirection="column">
         {rest}
-        <Box flexDirection="row" gap={2}>
-          <Text color={color}>● Subagents</Text>
-          <Text color={color}>{textBar(ratio(b), width)}</Text>
-          <Text bold>{barLabel(b)}</Text>
-          {b.running > 0 && !b.isFinished && <Text dimColor>{b.running} running</Text>}
-          <Text dimColor>{percent}</Text>
-          {crew}
-          {dismiss}
-        </Box>
+        {rows.map(([key, r, extra]) => {
+          const [lit, dim] = segmentText(r.segs, width)
+          return (
+            <Box key={key} flexDirection="row" gap={2}>
+              <Text color={r.color}>● {r.title}</Text>
+              <Text>
+                <Text color={r.color}>{lit}</Text>
+                <Text dimColor>{dim}</Text>
+              </Text>
+              {r.end && (
+                <Text dimColor wrap="truncate-end">
+                  {r.end}
+                </Text>
+              )}
+              {extra}
+            </Box>
+          )
+        })}
       </Box>
     )
   })

@@ -7,7 +7,7 @@
     {
       "name": "agent-progress",
       "source": "./mods/agent-progress",
-      "description": "A progress bar above the prompt for the subagents Claude starts, and an Agents pane with each one's model, step progress, context, estimated cost and time."
+      "description": "A progress bar above the prompt for Claude's own work and the subagents it starts, and an Agents pane with each one's model, step progress, context, estimated cost and time."
     },
     {
       "name": "cache",
