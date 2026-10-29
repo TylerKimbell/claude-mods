@@ -12,28 +12,29 @@ Every step is safe to run again on a machine that already has some of this insta
 | --- | --- | --- | --- |
 | 1 | `filetree@claude-code-filetree` | data-goblin/claude-code-filetree | Live file tree pane |
 | 2 | `agent-progress@claude-mods` | this repo | Subagent bar and Agents pane |
-| 3 | `cache-clock@claude-mods` | this repo | Cache countdown and context in the band (our fork) |
+| 3 | `cache@claude-mods` | this repo | Cache countdown in the status line (our cache-clock fork) |
 | 4 | `cache-warmer@claude-mods` | this repo | Keeps big sessions' cache warm while idle |
 | 5 | `launch-codes@claude-mods` | this repo | Code-and-LAUNCH guard on risky commands and .env edits |
-| 6 | `usage-credits@claude-mods` | this repo | 5-hour and weekly use and credits left, on the status line |
+| 6 | `usage@claude-mods` | this repo | 5-hour and weekly use and credits left, on the status line |
 | 7 | `usage-quota@claude-mods` | this repo | The context band: context use, Compact, Auto compact (our fork) |
 
 Do **not** install these, on purpose:
 
-- `cache-clock@claude-code-mods` (Ray Amjad's original). Ours in `mods/cache-clock` replaces it. Both together draw two countdowns.
+- `cache-clock@claude-code-mods` (Ray Amjad's original). Ours in `mods/cache` replaces it. Both together draw two countdowns.
+- `cache-clock@claude-mods` and `usage-credits@claude-mods`: the earlier names of `cache` and `usage`. Each pair together draws its status entry twice.
 - `usage-quota@claude-code-usage-quota-mod` (Anant Raghunath's original). Ours in `mods/usage-quota` replaces it. The original also draws the 5-hour and weekly meters, polls the usage endpoint every two minutes (which gets refused with 429s), and hides every band row installed after it.
 - next-steps (spends tokens every turn) and secret-box (not needed).
 
 ## Install order
 
-Mods load in install order, and the band above the prompt is drawn in that order: the first mod's row on top, each passing the rest down. Every mod here passes the draw down, so the order hides nothing; it only sets the layout. usage-quota goes last so the context band sits right above the prompt, with cache-clock's line at the top of the band. Step 7 checks it.
+Mods load in install order, and that order sets two layouts. The band above the prompt is drawn in it: the first mod's row on top, each passing the rest down. Every mod here passes the draw down, so the order hides nothing. The status line under the prompt lists each mod's entry in it too, left to right. So cache goes before launch-codes and usage (its countdown reads first), and usage-quota goes last so the context band sits right above the prompt. Step 7 checks both. To reorder later, uninstall the mods that should come later and install them again.
 
 ## Steps
 
 ### 1. Check what is needed
 
 - Claude Code 2.1.287 or later. `claude --version`, or step 2's path, prints it.
-- Signed in to Claude with a subscription. usage-credits reads the plan's usage and your credit balance; with an API key it shows nothing.
+- Signed in to Claude with a subscription. usage reads the plan's usage and your credit balance; with an API key it shows nothing.
 - Git, and read access to TylerKimbell/claude-mods (this folder is a clone, so that is already true).
 - Mods do not load in WSL sessions of the desktop app. Use a native Windows, macOS or Linux session.
 
@@ -41,7 +42,7 @@ Mods load in install order, and the band above the prompt is drawn in that order
 
 Try `claude --version`. If it is not found, the machine probably has only the desktop app, which bundles the CLI without putting it on PATH. Find it and use its full path for every `claude` command below:
 
-- Windows: `%APPDATA%\Claude\claude-code\<version>\<hash>\claude.exe`. Pick the highest version: `ls -d "$APPDATA"/Claude/claude-code/*/*/claude.exe | sort -V | tail -1` in Git Bash.
+- Windows: `%LOCALAPPDATA%\Claude-Data\claude_<id>\claude-code\<version>\<hash>\claude.exe` (desktop app 4.29 and later), or `%APPDATA%\Claude\claude-code\<version>\<hash>\claude.exe` (earlier). Pick the highest version: `ls -d "$LOCALAPPDATA"/Claude-Data/*/claude-code/*/*/claude.exe "$APPDATA"/Claude/claude-code/*/*/claude.exe 2>/dev/null | sort -V | tail -1` in Git Bash.
 - macOS or Linux: search the desktop app's support folder for a `claude-code/<version>/.../claude` executable, or install the CLI.
 
 Below, `claude` means that command or path. In Git Bash, `CLAUDE="<path>"` and `"$CLAUDE"` works.
@@ -58,7 +59,11 @@ Then, before installing anything, remove the originals our forks replace, if the
 ```bash
 claude plugin uninstall cache-clock@claude-code-mods
 claude plugin uninstall usage-quota@claude-code-usage-quota-mod
+claude plugin uninstall cache-clock@claude-mods
+claude plugin uninstall usage-credits@claude-mods
 ```
+
+The last two are the earlier names of `cache` and `usage`; an uninstall of a plugin that is not installed just says so.
 
 ### 4. Add the two marketplaces
 
@@ -78,10 +83,10 @@ Skip any that step 3 showed as installed.
 ```bash
 claude plugin install filetree@claude-code-filetree --scope user
 claude plugin install agent-progress@claude-mods --scope user
-claude plugin install cache-clock@claude-mods --scope user
+claude plugin install cache@claude-mods --scope user
 claude plugin install cache-warmer@claude-mods --scope user
 claude plugin install launch-codes@claude-mods --scope user
-claude plugin install usage-credits@claude-mods --scope user
+claude plugin install usage@claude-mods --scope user
 ```
 
 Messages about userConfig options not being set are expected: every mod's defaults are the setup. Nothing needs configuring.
@@ -108,10 +113,10 @@ rm "$T/mods-order.log"
 ```
 hooks module filetree@claude-code-filetree loaded (worker, environment 1
 hooks module agent-progress@claude-mods loaded (worker, environment 2
-hooks module cache-clock@claude-mods loaded (worker, environment 3
+hooks module cache@claude-mods loaded (worker, environment 3
 hooks module cache-warmer@claude-mods loaded (worker, environment 4
 hooks module launch-codes@claude-mods loaded (worker, environment 5
-hooks module usage-credits@claude-mods loaded (worker, environment 6
+hooks module usage@claude-mods loaded (worker, environment 6
 hooks module usage-quota@claude-mods loaded (worker, environment 7
 ```
 
@@ -126,14 +131,14 @@ Restart the desktop app, or start a new session (in an open session, `/reload-pl
 | `/launch-codes test git push --force` | `Needs launch codes: git push --force rewrites remote history.` |
 | `/credits` | `Plan: 5-hour …% (resets in …) · weekly …% (resets in …)`, then `Usage credits: $… left · …` |
 | `/warmer` | `Cache warmer on · …` |
-| `/cache-clock` | the countdown line as text |
+| `/cache` | the countdown line as text |
 | `/quota` | `Context band off.`, and again to turn it back on |
 | `/agents` | the Agents pane opens |
 
 And on screen, after sending any message:
 
-- The band above the prompt has cache-clock's `◷ cache 59:… left · ctx …` line on top, then the context band: `Context …% used  …k free of 1M` with Auto compact, Compact and ▼ beside it, the context bar, and a `Messages · Tools · Other` row. agent-progress's subagent bar joins the band whenever Claude runs subagents.
-- The status line under the prompt reads `usage-credits  5h …% · Weekly …% · Credits $… left`.
+- The band above the prompt is the context band: `Context …% used  …k free of 1M` with Auto compact, Compact and ▼ beside it, the context bar, and a `Messages · Tools · Other` row. agent-progress's subagent bar joins the band whenever Claude runs subagents.
+- The status line under the prompt has `launch-codes on`, `cache ◷ 59:… left · 1h ttl` and `usage 5h …% · Weekly …% · $… left`, all on one row with no `+1` fold.
 - A Files tab (filetree) sits beside the chat.
 
 The first time a new mod loads, the desktop app may ask whether to allow it. Allow it.

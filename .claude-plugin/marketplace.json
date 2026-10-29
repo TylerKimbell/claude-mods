@@ -10,9 +10,9 @@
       "description": "A progress bar above the prompt for the subagents Claude starts, and an Agents pane with each one's model, step progress, context, estimated cost and time."
     },
     {
-      "name": "cache-clock",
-      "source": "./mods/cache-clock",
-      "description": "A one-line band above the prompt: context used and a countdown until the prompt cache goes cold. Fork of Ray Amjad's cache-clock that also restarts on cache-warmer's pings; handoff off by default."
+      "name": "cache",
+      "source": "./mods/cache",
+      "description": "A countdown in the status line under the prompt until the prompt cache goes cold. Fork of Ray Amjad's cache-clock that also restarts on cache-warmer's pings; handoff off by default."
     },
     {
       "name": "cache-warmer",
@@ -25,14 +25,14 @@
       "description": "Risky Bash and PowerShell commands and .env edits need launch codes: a red alert pane, a 4-character code to arm, and a LAUNCH to fire."
     },
     {
-      "name": "usage-credits",
-      "source": "./mods/usage-credits",
+      "name": "usage",
+      "source": "./mods/usage",
       "description": "The plan's 5-hour and weekly use and your usage credits (the pool Fable draws on) on the status line under the prompt, refreshed from the session and your account."
     },
     {
       "name": "usage-quota",
       "source": "./mods/usage-quota",
-      "description": "A compact context band above the prompt: context use with its breakdown, one-click Compact and per-session Auto compact. Fork of Anant Raghunath's usage-quota without the 5-hour and weekly meters (usage-credits shows those) and without polling."
+      "description": "A compact context band above the prompt: context use with its breakdown, one-click Compact and per-session Auto compact. Fork of Anant Raghunath's usage-quota without the 5-hour and weekly meters (the usage mod shows those) and without polling."
     },
     {
       "name": "mod-template",

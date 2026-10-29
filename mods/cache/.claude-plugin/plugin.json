@@ -1,12 +1,12 @@
 {
-  "name": "cache-clock",
-  "version": "0.6.0",
-  "description": "A one-line band above the prompt: context used, and a countdown until the prompt cache goes cold. Fork of Ray Amjad's cache-clock that also restarts the clock when a mod (cache-warmer) forks over the transcript; handoff off by default.",
+  "name": "cache",
+  "version": "0.7.0",
+  "description": "A status line entry under the prompt: a countdown until the prompt cache goes cold. Fork of Ray Amjad's cache-clock (renamed to keep the entry short) that also restarts the clock when a mod (cache-warmer) forks over the transcript; handoff off by default.",
   "author": {
     "name": "Ray Amjad",
     "url": "https://github.com/ray-amjad"
   },
-  "repository": "https://github.com/TylerKimbell/claude-mods/tree/main/mods/cache-clock",
+  "repository": "https://github.com/TylerKimbell/claude-mods/tree/main/mods/cache",
   "license": "MIT",
   "userConfig": {
     "onWarning": {

@@ -1,27 +1,29 @@
-# cache-clock (fork)
+# cache (a fork of cache-clock)
 
-A Claude Code mod that puts one line above the prompt: how long until the prompt cache goes cold, how full the context window is, and a separate clock for subagents while one is warm.
+A Claude Code mod that puts a countdown in the status line under the prompt: how long until the prompt cache goes cold, and a separate clock for subagents while one is warm.
 
-This is a fork of [Ray Amjad's cache-clock](https://github.com/ray-amjad/claude-code-mods/tree/main/plugins/cache-clock) 0.5.4 (MIT) with two changes:
+This is a fork of [Ray Amjad's cache-clock](https://github.com/ray-amjad/claude-code-mods/tree/main/plugins/cache-clock) 0.5.4 (MIT) with four changes:
 
 - The clock also restarts when a mod forks over the transcript, which is what [cache-warmer](../cache-warmer/README.md)'s ping is. Upstream only sees a turn's own requests and `/recap` or `/btw`, so after a warming ping it would say the cache went cold when it had not.
 - `onWarning` defaults to `off` (no handoff note written into the project).
+- The line moved from the band above the prompt to the status line under it: `cache ◷ 59:43 left · 1h ttl`. The desktop app's next-step card covers the band, and the status line stays on screen.
+- The mod is named `cache`, since the app heads the status entry with the mod's name, and the line is kept short so the status line does not overflow into its `+1` fold. The `ctx` piece (context used, with its ten-block bar) is gone too: [usage-quota](../usage-quota/README.md)'s band shows the same figure with a breakdown.
 
 Install this one instead of the upstream, not alongside it.
 
 Every request to the model writes the conversation to the prompt cache. If the next request arrives before the cache expires, everything so far is read back at a fraction of the price. If it arrives after, the whole context is sent again at full price. Claude Code never shows you which side of that line you are on. This does.
 
 - The countdown restarts on every model request. Subagent requests run their own `sub` clock.
-- It turns yellow in the last quarter and red near the end, and pops a toast when the warning time is reached (optionally with a sound).
+- It pops a toast when the warning time is reached (optionally with a sound).
 - At zero it says `cache cold`, and a toast tells you the next message is a full-price write.
-- The TTL is read from the session itself: the API records whether each cache write was a 1 hour or a 5 minute one, and the band says `measured` once it has seen one.
+- The TTL is read from the session itself: the API records whether each cache write was a 1 hour or a 5 minute one, and the countdown uses it from then on.
 - At the warning, if Claude is idle and you haven't replied, it acts while the cache is still warm. You pick what it does in the plugin's settings (`onWarning`):
   - `handoff` (the default): Claude writes a handoff note, `HANDOFF-<first 8 characters of the session id>.md`, in the project root, in case you don't come back. Each session has its own file, so parallel sessions in one folder don't overwrite each other.
   - `off`: just the toast.
 
   It runs once per idle stretch and re-arms when you send a message.
 - Want the session compacted instead? Use Claude Code's own idle compaction (2.1.299 and later, on by default): a conversation of 200K+ tokens left idle for about 54 minutes is compacted before its one-hour cache expires. Turn it on or off with `Idle compaction` in `/config`, and change the 200K minimum with `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS`. The mod's own `compact` option is gone; a saved `compact` now acts as `off`.
-- `/cache-clock` prints the same line as text.
+- `/cache` prints the same line as text.
 
 Does nothing in -p / SDK sessions.
 
@@ -30,15 +32,14 @@ The handoff is the only thing it sends to Claude: one short turn on a warm cache
 ## Install
 
 ```
-claude plugin marketplace add ray-amjad/claude-code-mods
-claude plugin install cache-clock@claude-code-mods
+claude plugin install cache --marketplace TylerKimbell/claude-mods
 ```
 
-Or inside Claude Code: `/plugin marketplace add ray-amjad/claude-code-mods`, then `/plugin install cache-clock@claude-code-mods`.
+Or inside Claude Code: `/plugin install cache --marketplace TylerKimbell/claude-mods`. Not alongside the upstream `cache-clock`, or an earlier install of this fork under that name.
 
 ## Settings
 
-`onWarning` is a plugin setting: set it with `/plugin configure cache-clock@claude-code-mods`. The rest are optional environment variables. Minutes may be fractional.
+`onWarning` is a plugin setting: set it with `/plugin configure cache@claude-mods`. The rest are optional environment variables. Minutes may be fractional.
 
 | Variable | Default | What it does |
 | :- | :- | :- |
@@ -58,25 +59,23 @@ CACHE_CLOCK_MAIN_TTL_MIN=2 CACHE_CLOCK_WARN_MIN=1.5 claude
 
 ## How it works
 
-- Every `turn.step` (one per model request) restarts the main clock, or the `sub` clock when the step carries an `agentId`. A one second `$.clock.every` redraws the band and checks the warning.
+- Every `turn.step` (one per model request) restarts the main clock, or the `sub` clock when the step carries an `agentId`. A one second `$.clock.every` pins the status line again and checks the warning.
 - `/recap` and `/btw` send the conversation to the model outside a turn, so no `turn.step` fires for them. Their request reads the main cache all the same, so a `command.run` hook on each restarts the main clock too, while the cache is still warm (a bare `/btw` sends nothing and is ignored).
 - After each turn it reads the end of the session transcript for the newest main-thread `usage.cache_creation`: tokens in `ephemeral_1h` mean 1 hour, `ephemeral_5m` mean 5 minutes. On `--resume` it seeds the clock from the session's `seconds_since_last_response`.
-- Context comes from `$.session.usage()` at start, then the pushed `session.measure` figures.
 - The warning action: when the warning fires, no turn is running (`turn.start`/`turn.complete`) and nothing has run since your last prompt, `handoff` calls `$.prompt.submit`. A `prompt.submit` hook re-arms it on your next prompt.
 
 ## Limits
 
 - The clock counts from when each request was sent, so it can run a few seconds conservative.
-- A message sent while the band says cold still works; it is just a full-price cache write.
-- If none of the last 300 transcript lines wrote to the cache, the TTL keeps its previous or default value and is labelled `assumed`.
+- A message sent while the line says cold still works; it is just a full-price cache write.
+- If none of the last 300 transcript lines wrote to the cache, the TTL keeps its previous or default value (60 minutes at first).
 - State lives in memory, so after a hot reload the clock waits for the next turn.
 - A later handoff in the same session overwrites that session's note, and it fires even if you have a draft typed but not sent (the draft stays in the box).
-- In a narrow terminal the line drops pieces from the right (the TTL label, then `sub`, then ctx) instead of wrapping.
 
 ## Develop
 
 ```
-claude --plugin-dir ./cache-clock
+claude --plugin-dir ./cache
 claude plugin validate .
 claude plugin test .
 ```

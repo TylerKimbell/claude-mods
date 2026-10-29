@@ -113,7 +113,7 @@ describe('launch-codes', () => {
       await $.session.start(session)
       const out = await $.command.run({ command: 'launch-codes', args: 'off', origin: { kind } } as never)
       expect(String(out.text)).toContain('OFF for this session')
-      expect(String(w.lines[w.lines.length - 1])).toContain('launch-codes OFF')
+      expect(String(w.lines[w.lines.length - 1])).toContain('off')
       // Risky commands and .env edits now run with no dialog.
       expect((await $.tool.call({ tool: 'Bash', command: 'git push --force origin main' })).deny).toBe(undefined)
       expect((await $.tool.call({ tool: 'PowerShell', command: 'Remove-Item -Recurse -Force C:\\work' })).deny).toBe(undefined)
@@ -122,10 +122,10 @@ describe('launch-codes', () => {
       // The reminder is pinned again at each turn.
       w.lines.length = 0
       await $.turn.start({ text: 'go', turnId: 't1' })
-      expect(String(w.lines[w.lines.length - 1])).toContain('launch-codes OFF')
+      expect(String(w.lines[w.lines.length - 1])).toContain('off')
       // On again: the guard asks, and ABORT blocks.
       await $.command.run({ command: 'launch-codes', args: 'on', origin: { kind } } as never)
-      expect(w.lines[w.lines.length - 1]).toBe(undefined)
+      expect(w.lines[w.lines.length - 1]).toBe('on')
       expect(typeof (await $.tool.call({ tool: 'Bash', command: 'git push --force origin main' })).deny).toBe('string')
       expect(w.asks.length).toBe(1)
     })
@@ -142,6 +142,16 @@ describe('launch-codes', () => {
       expect(w.ran).toEqual([])
     })
   }
+
+  test('the status line says the guard is on from the start and at each turn', async ($, on) => {
+    mock.clock(on, { now: 1_000_000 })
+    const w = world(on, [])
+    await $.session.start(session)
+    expect(w.lines[w.lines.length - 1]).toBe('on')
+    w.lines.length = 0
+    await $.turn.start({ text: 'go', turnId: 't1' })
+    expect(w.lines[w.lines.length - 1]).toBe('on')
+  })
 
   test('/launch-codes test says which commands need codes', async ($, on) => {
     mock.clock(on, { now: 1_000_000 })

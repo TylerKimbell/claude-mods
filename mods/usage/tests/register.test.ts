@@ -112,7 +112,7 @@ describe('parsing', () => {
 
   test('with a balance, the line leads with it and keeps the monthly limit beside it', async () => {
     const c = { ...parseCredits(answer(9384), 1)!, balanceMinor: 9149 }
-    expect(statusText(c)).toBe('Credits $91.49 left')
+    expect(statusText(c)).toBe('$91.49 left')
     expect(summary(c)).toBe('$91.49 left · this month $93.84 of $100 monthly limit (94%)')
   })
 
@@ -126,7 +126,7 @@ describe('parsing', () => {
     expect(parsed.usedMinor).toBe(9384)
     expect(parsed.isLimitReached).toBe(false)
     const c = { ...parsed, balanceMinor: 9149 }
-    expect(statusText(c)).toBe('Credits $91.49 left')
+    expect(statusText(c)).toBe('$91.49 left')
     expect(summary(c)).toBe('$91.49 left · no monthly limit, $93.84 spent this month')
     // With neither a balance nor a limit, the status line is cleared rather than guessed.
     expect(statusText(parsed)).toBe(undefined)
@@ -139,7 +139,7 @@ describe('parsing', () => {
   })
 })
 
-describe('usage-credits', () => {
+describe('usage', () => {
   test('the band shows the balance after the first refresh, on both surfaces', { options: { showBand: true } }, async ($, on) => {
     const clock = mock.clock(on, { now: 1_000_000 })
     const w = world(on)
@@ -148,7 +148,7 @@ describe('usage-credits', () => {
     expect(w.fetches).toBe(1)
     expect(w.store.get('last')).toBeTruthy()
     for (const surface of ['desktop', 'terminal'] as const) {
-      const ui = await $.ui.mount({ plugin: 'usage-credits', surface, component: 'AbovePrompt', props: band })
+      const ui = await $.ui.mount({ plugin: 'usage', surface, component: 'AbovePrompt', props: band })
       expect(String((await ui.find({ type: 'Text', text: /Credits/ }))?.text)).toBe('◆ Credits $57.51 left of $100 · 42% used')
       expect(await ui.find({ type: 'Text', text: /^other mod$/ })).toBeTruthy()
       await ui.unmount()
@@ -160,8 +160,8 @@ describe('usage-credits', () => {
     const w = world(on)
     await $.session.start(session)
     await clock.advance(1)
-    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 0% · Credits $57.51 left of $100 · 42%')
-    const ui = await $.ui.mount({ plugin: 'usage-credits', surface: 'desktop', component: 'AbovePrompt', props: band })
+    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 0% · $57.51 left of $100 · 42%')
+    const ui = await $.ui.mount({ plugin: 'usage', surface: 'desktop', component: 'AbovePrompt', props: band })
     expect(await ui.find({ type: 'Text', text: /Credits/ })).toBe(undefined)
     expect(await ui.find({ type: 'Text', text: /^other mod$/ })).toBeTruthy()
     await ui.unmount()
@@ -178,7 +178,7 @@ describe('usage-credits', () => {
     expect(w.fetches).toBe(2)
 
     await $.command.run({ command: 'credits', args: 'hide' })
-    const ui = await $.ui.mount({ plugin: 'usage-credits', surface: 'desktop', component: 'AbovePrompt', props: band })
+    const ui = await $.ui.mount({ plugin: 'usage', surface: 'desktop', component: 'AbovePrompt', props: band })
     expect(await ui.find({ type: 'Text', text: /Credits/ })).toBe(undefined)
     await $.command.run({ command: 'credits', args: 'show' })
     expect(await ui.find({ type: 'Text', text: /Credits/ })).toBeTruthy()
@@ -207,7 +207,7 @@ describe('usage-credits', () => {
     w.balance = 9149
     await $.session.start(session)
     await clock.advance(1)
-    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 0% · Credits $91.49 left')
+    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 0% · $91.49 left')
     const out = await $.command.run({ command: 'credits', args: '' })
     expect(String(out.text)).toContain('$91.49 left · this month $93.84 of $100 monthly limit (94%)')
     expect(w.profiles).toBe(1)
@@ -215,7 +215,7 @@ describe('usage-credits', () => {
     // The billing endpoint fails: the last balance stands rather than flipping the line back.
     w.balance = null
     await clock.advance(10 * 60_000)
-    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 0% · Credits $91.49 left')
+    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 0% · $91.49 left')
     expect(w.profiles).toBe(1)
   })
 
@@ -225,15 +225,15 @@ describe('usage-credits', () => {
     w.balance = 9149
     await $.session.start(session)
     await clock.advance(1)
-    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 0% · Credits $91.49 left')
+    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 0% · $91.49 left')
     // The usage endpoint refuses; the balance moves on its own.
     w.status = 429
     w.balance = 8000
     await clock.advance(10 * 60_000)
-    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 0% · Credits $80 left')
+    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 0% · $80 left')
     w.balance = 7500
     await clock.advance(10 * 60_000)
-    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 0% · Credits $75 left')
+    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 0% · $75 left')
   })
 
   test('the 5-hour and weekly windows lead the status line, from the usage answer', async ($, on) => {
@@ -243,7 +243,7 @@ describe('usage-credits', () => {
     w.week = 3
     await $.session.start(session)
     await clock.advance(1)
-    expect(w.lines[w.lines.length - 1]).toBe('5h 12% · Weekly 3% · Credits $57.51 left of $100 · 42%')
+    expect(w.lines[w.lines.length - 1]).toBe('5h 12% · Weekly 3% · $57.51 left of $100 · 42%')
     const out = await $.command.run({ command: 'credits', args: '' })
     expect(String(out.text)).toContain('Plan: 5-hour 12% (resets in')
     expect(String(out.text)).toContain('weekly 3% (resets in')
@@ -258,17 +258,17 @@ describe('usage-credits', () => {
     on('session.measure', ($, e) => ({ changed: e.changed }))
     await $.session.start(session)
     await clock.advance(1)
-    expect(w.lines[w.lines.length - 1]).toBe('5h 10% · Weekly 0% · Credits $91.49 left')
+    expect(w.lines[w.lines.length - 1]).toBe('5h 10% · Weekly 0% · $91.49 left')
     const measure = (five: number, resetsAt: string) =>
       $.session.measure({ context: { window: 1_000_000 }, rateLimits: [{ kind: 'five_hour', percentUsed: five, resetsAt }], changed: ['rateLimits'] } as never)
     await measure(20, FIVE_RESET)
-    expect(w.lines[w.lines.length - 1]).toBe('5h 20% · Weekly 0% · Credits $91.49 left')
+    expect(w.lines[w.lines.length - 1]).toBe('5h 20% · Weekly 0% · $91.49 left')
     // A lower figure for the same window is a lagging reading: 20 stands.
     await measure(15, FIVE_RESET)
-    expect(w.lines[w.lines.length - 1]).toBe('5h 20% · Weekly 0% · Credits $91.49 left')
+    expect(w.lines[w.lines.length - 1]).toBe('5h 20% · Weekly 0% · $91.49 left')
     // A new window (it reset) takes the newer reading.
     await measure(1, '2026-10-25T08:09:59Z')
-    expect(w.lines[w.lines.length - 1]).toBe('5h 1% · Weekly 0% · Credits $91.49 left')
+    expect(w.lines[w.lines.length - 1]).toBe('5h 1% · Weekly 0% · $91.49 left')
   })
 
   test('a window whose reset has passed reads 0%', async ($, on) => {
@@ -279,7 +279,7 @@ describe('usage-credits', () => {
     w.week = 7
     await $.session.start(session)
     await clock.advance(1)
-    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 7% · Credits $91.49 left')
+    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 7% · $91.49 left')
   })
 
   test('with showWindows off, the line is the credits alone', { options: { showWindows: false } }, async ($, on) => {
@@ -289,7 +289,7 @@ describe('usage-credits', () => {
     w.five = 12
     await $.session.start(session)
     await clock.advance(1)
-    expect(w.lines[w.lines.length - 1]).toBe('Credits $91.49 left')
+    expect(w.lines[w.lines.length - 1]).toBe('$91.49 left')
   })
 
   test('every turn re-pins the status line from the reading in hand, even inside a 429 backoff', async ($, on) => {
@@ -303,10 +303,10 @@ describe('usage-credits', () => {
     const fetches = w.fetches
     w.lines.length = 0
     await $.turn.start({ text: 'go', turnId: 't1' })
-    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 0% · Credits $57.51 left of $100 · 42%')
+    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 0% · $57.51 left of $100 · 42%')
     await $.turn.complete({ answer: 'x', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never)
     await clock.advance(1)
-    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 0% · Credits $57.51 left of $100 · 42%')
+    expect(w.lines[w.lines.length - 1]).toBe('5h 0% · Weekly 0% · $57.51 left of $100 · 42%')
     // Inside the backoff: no request was made for it.
     expect(w.fetches).toBe(fetches)
   })
@@ -349,7 +349,7 @@ describe('usage-credits', () => {
     await clock.advance(1)
     w.status = 500
     await clock.advance(10 * 60_000)
-    const ui = await $.ui.mount({ plugin: 'usage-credits', surface: 'terminal', component: 'AbovePrompt', props: band })
+    const ui = await $.ui.mount({ plugin: 'usage', surface: 'terminal', component: 'AbovePrompt', props: band })
     expect(String((await ui.find({ type: 'Text', text: /Credits/ }))?.text)).toContain('$57.51 left')
     expect(String((await ui.find({ type: 'Text', text: /failed/ }))?.text)).toContain('failed (500)')
     await ui.unmount()

@@ -1,9 +1,9 @@
-# usage-credits
+# usage
 
 Your plan's 5-hour and weekly use and your usage credits, in the status line under the prompt.
 
 ```
-usage-credits  5h 10% · Weekly 2% · Credits $91.49 left
+usage  5h 10% · Weekly 2% · $91.49 left
 ```
 
 **5h** and **Weekly** are the plan's two rate-limit windows. They come from the engine after every reply, at no cost, and from the usage endpoint this mod already reads. Within one window the higher reading stands, since the per-reply figures are whole percents and can lag the service. A window whose reset has passed reads 0%. The `showWindows` option takes them off the line.
@@ -45,7 +45,7 @@ Only Claude subscriptions have usage credits. With an API key or a gateway there
 At the prompt of a terminal `claude` session:
 
 ```
-/plugin install usage-credits --marketplace TylerKimbell/claude-mods
+/plugin install usage --marketplace TylerKimbell/claude-mods
 ```
 
 In the desktop app: **+** next to the prompt, **Plugins**, **Add marketplace** with `TylerKimbell/claude-mods`, then **Add plugin**.

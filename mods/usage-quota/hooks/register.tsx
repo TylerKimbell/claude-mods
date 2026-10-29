@@ -1,5 +1,5 @@
 // Fork of Anant Raghunath's usage-quota 0.1.6 (MIT) in TylerKimbell/claude-mods: the context band
-// alone (the 5-hour and weekly windows moved to usage-credits' status line), no polling of
+// alone (the 5-hour and weekly windows moved to the usage mod's status line), no polling of
 // the usage endpoint, and the band draw passed on to the mods beneath it.
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionRateLimit } from 'claude-code'
@@ -592,7 +592,7 @@ async function refresh($: EngineInterface, ask: Ask = 'no'): Promise<void> {
         .filter(c => c.kind === 'buffer' || c.kind === 'free')
         .map(c => ({ name: c.name, tokens: c.tokens, kind: c.kind as Category['kind'] })),
     ].filter(c => c.tokens > 0)
-    // This fork leaves the plan's 5-hour and weekly windows to usage-credits' status line:
+    // This fork leaves the plan's 5-hour and weekly windows to the usage mod's status line:
     // no limits are read, so the usage endpoint is never asked from here.
     const limits: Limit[] = []
     const next: Snapshot = {

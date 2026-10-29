@@ -1,4 +1,4 @@
-// usage-credits: the account's usage credits (what Fable draws on once the plan limits are
+// usage: the account's usage credits (what Fable draws on once the plan limits are
 // hit) above the prompt, read from the same account endpoint the app's usage page reads,
 // through the session's own credential. The mod never sees the token.
 import { atom, read, update } from 'claude-code'
@@ -16,9 +16,9 @@ const BACKOFF_MS = 15 * 60_000
 const DEFAULT_POLL_MINUTES = 10
 const DEFAULT_WARN_AT = 80
 
-const credits = atom({ plugin: 'usage-credits', key: 'credits' } as const, null as Credits | null)
-const view = atom({ plugin: 'usage-credits', key: 'view' } as const, { isHidden: false, error: '' } as View)
-const windows = atom({ plugin: 'usage-credits', key: 'windows' } as const, {} as Windows)
+const credits = atom({ plugin: 'usage', key: 'credits' } as const, null as Credits | null)
+const view = atom({ plugin: 'usage', key: 'view' } as const, { isHidden: false, error: '' } as View)
+const windows = atom({ plugin: 'usage', key: 'windows' } as const, {} as Windows)
 
 const GREEN = '#5fbf8f'
 const AMBER = '#d9a441'
@@ -101,11 +101,12 @@ const money = (c: Credits, minor: number): string => fmtMoney(minor, c.exponent,
 
 const pct = (c: Credits): string => `${Math.round(c.percent ?? 0)}%`
 
-/** The status line under the prompt: the dollars left, and a flag only when something stops spending. */
+/** The status line under the prompt: the dollars left, and a flag only when something stops spending.
+ * The app heads the entry with the mod's name, `usage`, so the text itself does not say credits. */
 export const statusText = (c: Credits): string | undefined => {
   const flags = `${c.isLimitReached ? ' · monthly limit reached' : ''}${c.isEnabled ? '' : ' · credits off'}`
-  if (c.balanceMinor !== undefined) return `Credits ${money(c, c.balanceMinor)} left${flags}`
-  if (c.limitMinor !== undefined) return `Credits ${money(c, leftOf(c))} left of ${money(c, c.limitMinor)} · ${pct(c)}${flags}`
+  if (c.balanceMinor !== undefined) return `${money(c, c.balanceMinor)} left${flags}`
+  if (c.limitMinor !== undefined) return `${money(c, leftOf(c))} left of ${money(c, c.limitMinor)} · ${pct(c)}${flags}`
   return undefined
 }
 
@@ -468,7 +469,7 @@ export const register: Register = (on, options) => {
         <Box flexDirection="row" gap={1}>
           <Text color={colorOf(c, warnAt())}>{text}</Text>
           {note ? <Text dimColor>{note}</Text> : null}
-          <Button key="usage-credits-hide" label="✕" plain role="dismiss" onPress={() => update($, view, prev => ({ ...prev, isHidden: true }))} />
+          <Button key="usage-hide" label="✕" plain role="dismiss" onPress={() => update($, view, prev => ({ ...prev, isHidden: true }))} />
         </Box>
       </Box>
     )

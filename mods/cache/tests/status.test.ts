@@ -2,73 +2,63 @@ import { expect, mock, test } from 'claude-code/testing'
 
 import { forkRestart, handoffPath, lastLines, pickAction, setMainAt, tailCommand } from '../hooks/register'
 
-test('the band draws one line', async ($, on) => {
-  on('clock.now', () => ({ value: 1_000_000 }))
-  on('ui.render', () => ({ type: 'Text', children: [''] }) as never)
-  const ui = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 } } } as any)
-  expect(await ui.find({ type: 'Text', text: /cache/ } as any)).toBeDefined()
+// The countdown is a status line entry under the prompt, pinned once a second by the tick
+test('each tick pins the countdown on the status line', async ($, on) => {
+  mock.store(on, {})
+  mock.env(on, {})
+  const clock = mock.clock(on, { now: 1_000_000 })
+  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  on('command.register', () => ({ value: undefined }) as never)
+  const lines: unknown[] = []
+  on('ui.status', (_$, e: any) => { lines.push(e.text); return { value: undefined } as never })
+  await $.session.start({ cwd: '/nowhere', surface: 'desktop', isInteractive: true })
+  await clock.advance(1000)
+  expect(String(lines[lines.length - 1])).toBe('◷ no request yet · 1h ttl')
 })
 
-// Another mod's band (vercel-deploy-status, say) sits behind cache-clock in the chain
-test('the band draws the other mods\' bands under it', async ($, on) => {
-  on('clock.now', () => ({ value: 1_000_000 }))
-  let rows = -1
-  on('ui.render', { component: 'AbovePrompt' }, (_$, e: any) => {
-    rows = e.props.maxRows
-    return { type: 'Text', children: ['other band'] } as never
-  })
-  const ui = await $.ui.mount({ plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 } } } as any)
-  expect(await ui.find({ type: 'Text', text: /cache/ } as any)).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /other band/ } as any)).toBeDefined()
-  expect(rows).toBe(9)
-})
-
-const BAND = { plugin: 'cache-clock', surface: 'terminal', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 } } } as any
 const MIN = 60_000
-// The band's first piece: '◷ cache 10:00 left'
+// The status line's first piece, '◷ 10:00 left', read through /cache (the same text)
+// so it comes from the module the harness loaded, not this file's import of it
 async function cachePiece($: any) {
-  const text = (await (await $.ui.mount(BAND)).find({ type: 'Text', text: /◷/ } as any))?.text
-  return String(text).split('  ·  ')[0]
+  return String((await $.command.run({ command: 'cache', args: '' })).text).split(' · ')[0]
 }
 
 for (const [command, args] of [['recap', ''], ['btw', 'what word did you reply with?']]) {
   test(`/${command} restarts the main cache clock, though no turn.step fires for it (#15)`, async ($, on) => {
     let now = 1_000_000
     on('clock.now', () => ({ value: now }))
-    on('ui.render', () => ({ type: 'Text', children: [''] }) as never)
-    on('turn.step', async function* (_$, e) { return { turnId: e.turnId, index: e.index, answer: '', toolUses: [] } as any })
+      on('turn.step', async function* (_$, e) { return { turnId: e.turnId, index: e.index, answer: '', toolUses: [] } as any })
     on('command.run', () => ({ text: 'side answer' }))
 
     // Before any main request there is nothing cached to keep warm
     await $.command.run({ command, args } as any)
-    expect(await cachePiece($)).toBe('◷ cache: no request yet')
+    expect(await cachePiece($)).toBe('◷ no request yet')
 
     // A main turn starts the hour; 50 minutes later 10 are left
     const step = $.turn.step({ turnId: 't1', index: 0, model: 'm', messageCount: 1 } as any)
     for await (const _ of step);
     now += 50 * MIN
-    expect(await cachePiece($)).toBe('◷ cache 10:00 left')
+    expect(await cachePiece($)).toBe('◷ 10:00 left')
 
     // The side request reads the cache: a full hour again
     await $.command.run({ command, args } as any)
-    expect(await cachePiece($)).toBe('◷ cache 60:00 left')
+    expect(await cachePiece($)).toBe('◷ 60:00 left')
   })
 }
 
 test('a side request on a cold cache, or a bare /btw, leaves the clock alone', async ($, on) => {
   let now = 1_000_000
   on('clock.now', () => ({ value: now }))
-  on('ui.render', () => ({ type: 'Text', children: [''] }) as never)
   on('turn.step', async function* (_$, e) { return { turnId: e.turnId, index: e.index, answer: '', toolUses: [] } as any })
   on('command.run', () => ({ text: 'ok' }))
   const step = $.turn.step({ turnId: 't1', index: 0, model: 'm', messageCount: 1 } as any)
   for await (const _ of step);
   now += 50 * MIN
   await $.command.run({ command: 'btw', args: '  ' } as any)
-  expect(await cachePiece($)).toBe('◷ cache 10:00 left')
+  expect(await cachePiece($)).toBe('◷ 10:00 left')
   now += 20 * MIN
   await $.command.run({ command: 'recap', args: '' } as any)
-  expect(await cachePiece($)).toBe('◷ cache cold')
+  expect(await cachePiece($)).toBe('◷ cold')
 })
 
 // A mod's fork over the transcript (cache-warmer's ping) reads the main cache like a side request does
@@ -90,14 +80,13 @@ test('a fork served from a warm cache restarts the main clock; a miss or a cold 
 test('another command leaves the cache clock alone', async ($, on) => {
   let now = 1_000_000
   on('clock.now', () => ({ value: now }))
-  on('ui.render', () => ({ type: 'Text', children: [''] }) as never)
   on('turn.step', async function* (_$, e) { return { turnId: e.turnId, index: e.index, answer: '', toolUses: [] } as any })
   on('command.run', () => ({ text: 'ok' }))
   const step = $.turn.step({ turnId: 't1', index: 0, model: 'm', messageCount: 1 } as any)
   for await (const _ of step);
   now += 50 * MIN
   await $.command.run({ command: 'cost', args: '' } as any)
-  expect(await cachePiece($)).toBe('◷ cache 10:00 left')
+  expect(await cachePiece($)).toBe('◷ 10:00 left')
 })
 
 test('the warning action comes from the env var, then the old switch, then the setting', async () => {
@@ -136,7 +125,7 @@ test('tail reads the end on Mac and Linux; PowerShell on Windows, with the path 
   expect(init).toEqual({ env: { CACHE_CLOCK_FILE: path } })
 })
 
-// Headless (-p, SDK): no band timer and no /cache-clock command. The timer is
+// Headless (-p, SDK): no timer and no /cache command. The timer is
 // what would submit handoff turns, so it must not exist without a person.
 test('headless session starts no timer and no command', async ($, on) => {
   mock.store(on, {})

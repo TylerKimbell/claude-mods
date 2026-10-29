@@ -1,6 +1,6 @@
 {
-  "name": "usage-credits",
-  "version": "0.1.0",
+  "name": "usage",
+  "version": "0.2.0",
   "description": "Your plan's 5-hour and weekly usage and your usage credits (the pool Fable draws on) on the status line under the prompt, refreshed from the session and your account, with a warning as a monthly limit nears.",
   "license": "MIT",
   "types": "./types/index.d.ts",

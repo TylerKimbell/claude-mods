@@ -86,7 +86,7 @@ async function fieldKey(ui: { find: (q: { type: 'Input' }) => Promise<{ props: {
 }
 
 test('draws the context band: the summary beside the controls, the bar, the breakdown, and no plan windows', async ($, on) => {
-  // the session reports both windows; this fork leaves them to usage-credits' status line
+  // the session reports both windows; this fork leaves them to the usage mod's status line
   world(on, [
     { kind: 'five_hour', percentUsed: 8, resetsAt: iso(3 * HOUR + 24 * MIN) },
     { kind: 'seven_day', percentUsed: 46, resetsAt: iso(3 * 24 * HOUR + 7 * HOUR) },
@@ -640,7 +640,7 @@ test('passes the band on: a mod beneath draws under the context block', async ($
   }
 })
 
-test('never asks the usage endpoint: the plan windows live on usage-credits', async ($, on) => {
+test('never asks the usage endpoint: the plan windows live on the usage mod', async ($, on) => {
   const clock = startWorld(on, { value: 16 }, [])
   let fetches = 0
   on('http.fetch', () => {

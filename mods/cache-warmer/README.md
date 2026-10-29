@@ -28,9 +28,9 @@ Each ping drops one dim line into the transcript, `cache-warmer: pinged, 400k re
 
 `/warmer` prints the state: minutes left on the cache, context size, pings and cost this run and this session, and why the last check pinged, skipped or stopped. `/warmer off` and `/warmer on` switch it.
 
-## Alongside cache-clock
+## Alongside cache
 
-cache-clock's countdown only restarts on a turn's own requests, so after a ping it will still say the cache went cold when it did not. `/warmer` has the real figure. The two mods do not interfere otherwise.
+Our [cache](../cache/README.md) mod restarts its countdown on a ping, so the two agree. The upstream cache-clock only sees a turn's own requests, so after a ping it says the cache went cold when it did not; `/warmer` has the real figure. The two mods do not interfere otherwise.
 
 ## Install
 

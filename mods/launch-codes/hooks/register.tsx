@@ -13,7 +13,11 @@ const alert = atom({ plugin: 'launch-codes', key: 'alert' } as const, null as Al
 // Session state: survives /reload-plugins, starts false in every new session.
 const off = atom({ plugin: 'launch-codes', key: 'isOff' } as const, false)
 
-const OFF_STATUS = 'launch-codes OFF for this session · /launch-codes on to guard again'
+// The status line entry under the prompt, headed by the plugin's name (the app adds it):
+// `launch-codes on`, or `launch-codes off · /launch-codes on to guard again`.
+const ON_STATUS = 'on'
+const OFF_STATUS = 'off · /launch-codes on to guard again'
+const statusOf = (isOff: boolean) => (isOff ? OFF_STATUS : ON_STATUS)
 // Who may switch the guard off: the person, typing at a terminal (composer), through
 // Remote Control (bridge), or in a host such as the desktop app (sdk). Never a
 // notification, a schedule, another session, a channel, a plugin, or an origin the
@@ -108,15 +112,15 @@ export const register: Register = (on, options) => {
       name: 'launch-codes',
       description: 'Launch codes for risky commands: /launch-codes [demo | test <command> | off | on]',
     })
-    // After a reload, a session that switched the guard off still says so.
-    if (await read($, off)) $.ui.status(OFF_STATUS)
+    // The status line says whether the guard is on; after a reload a session that switched it off still says so.
+    $.ui.status(statusOf(await read($, off)))
     return next(e)
   })
 
-  // The reminder is pinned again at each turn: one set while a session starts can land
+  // The entry is pinned again at each turn: one set while a session starts can land
   // before the app attaches.
   on('turn.start', async ($, e, next) => {
-    if (!e.agentId && (await read($, off))) $.ui.status(OFF_STATUS)
+    if (!e.agentId) $.ui.status(statusOf(await read($, off)))
     return next(e)
   })
 
@@ -179,7 +183,7 @@ export const register: Register = (on, options) => {
         return { text: `launch-codes: /launch-codes ${arg} only works when you type it yourself (this one came from ${from}). Nothing changed.` }
       }
       await update($, off, () => arg === 'off')
-      $.ui.status(arg === 'off' ? OFF_STATUS : undefined)
+      $.ui.status(statusOf(arg === 'off'))
       return {
         text:
           arg === 'off'

@@ -1,6 +1,7 @@
 // Fork of Ray Amjad's cache-clock 0.5.4 (MIT) in TylerKimbell/claude-mods: also restarts the clock on a mod's fork over the transcript.
-// cache-clock: one line above the prompt that shows how full the context is
-// and how long until the prompt cache goes cold.
+// cache (the mod was cache-clock): a status line entry under the prompt that counts down until the prompt cache
+// goes cold. The status line stays on screen when the desktop app's next-step card covers the
+// band above the prompt; context use is usage-quota's band.
 
 // Defaults, in minutes. Each can be changed with an environment variable.
 const DEFAULT_MAIN_TTL_MIN = 60 // main session cache (matches what the transcripts record)
@@ -11,14 +12,12 @@ const MIN = 60_000
 
 // State shared by the hooks below
 const cfg = { mainTtl: DEFAULT_MAIN_TTL_MIN * MIN, subTtl: DEFAULT_SUB_TTL_MIN * MIN, warn: DEFAULT_WARN_MIN * MIN, sound: false, pinned: false, onWarning: 'handoff', handoffDir: '' }
-let ttlSource = 'assumed' // 'measured' once we read it from the transcript
 let mainAt = 0 // when the main session last sent a request (ms)
 let subAt = 0 // when a subagent last sent one
 let warned = false // toast already shown for this warm period
 let wentCold = false // "went cold" already shown
 let working = false // a turn is running
 let handedOff = false // handoff done since the user last sent something
-let context = null // { tokens, window, percent } from $.session.usage()
 let transcript = null // path to this session's .jsonl
 let headless = false // -p / SDK session: no band, so skip the transcript reads too
 
@@ -60,8 +59,8 @@ async function readTtl($) {
     try { msg = JSON.parse(row) } catch { continue }
     if (msg.type !== 'assistant' || msg.isSidechain) continue
     const cc = msg.message?.usage?.cache_creation ?? {}
-    if (cc.ephemeral_1h_input_tokens > 0) { cfg.mainTtl = 60 * MIN; ttlSource = 'measured'; return }
-    if (cc.ephemeral_5m_input_tokens > 0) { cfg.mainTtl = 5 * MIN; ttlSource = 'measured'; return }
+    if (cc.ephemeral_1h_input_tokens > 0) { cfg.mainTtl = 60 * MIN; return }
+    if (cc.ephemeral_5m_input_tokens > 0) { cfg.mainTtl = 5 * MIN; return }
     // a pure cache read does not say which bucket; look further back
   }
 }
@@ -101,12 +100,7 @@ function clock(ms) {
   return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0')
 }
 
-function fmtTokens(n) {
-  if (n >= 1_000_000) return +(n / 1_000_000).toFixed(1) + 'M'
-  return n >= 1000 ? Math.round(n / 1000) + 'k' : String(n)
-}
-
-// Everything the band shows, as plain pieces so /cache-clock can print it too
+// Everything the status line shows, as plain pieces so /cache can print it too
 function snapshot(now) {
   const left = mainAt ? mainAt + cfg.mainTtl - now : 0
   const subLeft = subAt ? subAt + cfg.subTtl - now : 0
@@ -115,20 +109,17 @@ function snapshot(now) {
   if (!mainAt || left <= 0) color = 'gray'
   else if (left <= cfg.warn) color = 'red'
   else if (left <= cfg.mainTtl / 4) color = 'yellow'
-  const ttl = (cfg.mainTtl >= 60 * MIN ? cfg.mainTtl / (60 * MIN) + 'h' : cfg.mainTtl / MIN + 'm') + ' ttl ' + (cfg.pinned ? 'set' : ttlSource)
-  const cache = !mainAt ? 'cache: no request yet' : left > 0 ? 'cache ' + clock(left) + ' left' : 'cache cold'
-  let ctx = 'ctx --'
-  if (context?.tokens) {
-    const pct = context.percent ?? Math.round((context.tokens / context.window) * 100)
-    const filled = Math.round(pct / 10)
-    ctx = 'ctx ' + fmtTokens(context.tokens) + '/' + fmtTokens(context.window) + ' ' + pct + '% ' + '▰'.repeat(filled) + '▱'.repeat(10 - filled)
-  }
+  const ttl = (cfg.mainTtl >= 60 * MIN ? cfg.mainTtl / (60 * MIN) + 'h' : cfg.mainTtl / MIN + 'm') + ' ttl'
+  const cache = !mainAt ? 'no request yet' : left > 0 ? clock(left) + ' left' : 'cold'
   const sub = subLeft > 0 ? 'sub ' + clock(subLeft) : null
-  return { color, cache, ttl, ctx, sub, left }
+  return { color, cache, ttl, sub, left }
 }
 
-function asText(s) {
-  return [s.cache + ' (' + s.ttl + ')', s.ctx, s.sub].filter(Boolean).join('  |  ')
+// The status line entry and /cache's text: '◷ 59:43 left · sub 4:59 · 1h ttl'. The app heads the
+// entry with the mod's name, `cache`, so the text itself says neither cache nor where the TTL came from.
+export function statusLine(now) {
+  const s = snapshot(now)
+  return ['◷ ' + s.cache, s.sub, s.ttl].filter(Boolean).join(' · ')
 }
 
 // The handoff prompt. The marker lets prompt.submit tell it from the user's own prompts.
@@ -179,7 +170,7 @@ async function sideRequest($, e, next) {
   return next(e)
 }
 
-// Once a second: warn near expiry, note when it goes cold, redraw the band
+// Once a second: warn near expiry, note when it goes cold, redraw the status line
 async function tick($) {
   const s = snapshot(await $.clock.now())
   if (mainAt && s.left > 0 && s.left <= cfg.warn && !warned) {
@@ -199,21 +190,27 @@ async function tick($) {
     wentCold = true
     $.ui.toast('Prompt cache is cold. The next message re-sends the whole context at full price.')
   }
-  $.ui.invalidate('ui.render')
+  await pin($)
+}
+
+// Pin the line on the status line. The tick does it once a second; the turn hooks do it
+// too, since a pin from outside a turn (after a reload, say) can land before the app shows it.
+async function pin($) {
+  $.ui.status(statusLine(await $.clock.now()))
 }
 
 export function register(on, options) {
   on('session.start', async ($, e, next) => {
-    // Headless (-p, SDK): no band, and the timer would submit handoff turns
+    // Headless (-p, SDK): no status line, and the timer would submit handoff turns
     // or compact with nobody at the prompt. Do nothing.
     headless = e.isInteractive === false
     if (headless) return next(e)
     await loadConfig($, options)
     // classic.SessionStart fires before this, so the transcript path is known: read the TTL here
     await readTtl($).catch(() => undefined)
-    context = (await $.session.usage()).context
-    await $.command.register({ name: 'cache-clock', description: 'Print the cache countdown and context use' })
+    await $.command.register({ name: 'cache', description: 'Print the prompt cache countdown' })
     $.clock.every(1000, () => tick($))
+    await pin($)
     return next(e)
   })
 
@@ -227,8 +224,8 @@ export function register(on, options) {
   }).catch(($, e, next) => (next.called ? undefined : next(e))) // never block the session on our error
 
   // Track whether a turn is running, so the warning action never queues behind one
-  on('turn.start', async ($, e, next) => { working = true; return next(e) })
-  on('turn.complete', async ($, e, next) => { working = false; return next(e) })
+  on('turn.start', async ($, e, next) => { working = true; await pin($); return next(e) })
+  on('turn.complete', async ($, e, next) => { working = false; await pin($); return next(e) })
 
   // A prompt from the user (not our own handoff) re-arms the warning action
   on('prompt.submit', async ($, e, next) => {
@@ -241,6 +238,7 @@ export function register(on, options) {
     const now = await $.clock.now()
     if (e.agentId) subAt = now
     else restartMain(now)
+    await pin($)
     yield* next(e)
   })
 
@@ -266,37 +264,8 @@ export function register(on, options) {
     return next(e)
   }).catch(($, e, next) => (next.called ? undefined : next(e)))
 
-  // Context figures, pushed after each turn
-  on('session.measure', async ($, e, next) => {
-    context = e.context
-    return next(e)
-  })
-
-  // The band itself: one line above the prompt, with the other mods' bands drawn under it
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.props.hasSurvey) return next(e)
-    // Our line takes one row, so the bands below get one fewer
-    // A band below that fails must not take ours with it
-    let below = null
-    try { below = await next({ ...e, props: { ...e.props, maxRows: Math.max(0, e.props.maxRows - 1) } }) } catch {}
-    const { Box, Text } = $.ui.resolve(e)
-    const s = snapshot(await $.clock.now())
-    // Pieces in order of importance; drop from the end until it fits one line
-    const pieces = [
-      { text: '◷ ' + s.cache, style: { color: s.color, bold: s.color === 'red' } },
-      { text: s.ctx, style: {} },
-      s.sub && { text: s.sub, style: { dimColor: true } },
-      { text: s.ttl, style: { dimColor: true } },
-    ].filter(Boolean)
-    const SEP = '  ·  '
-    while (pieces.length > 1 && pieces.map((p) => p.text).join(SEP).length > e.props.bodyColumns) pieces.pop()
-    const parts = pieces.flatMap((p, i) => i ? [h(Text, { dimColor: true }, SEP), h(Text, p.style, p.text)] : [h(Text, p.style, p.text)])
-    const line = h(Box, {}, h(Text, { wrap: 'truncate-end' }, ...parts))
-    return below ? h(Box, { flexDirection: 'column' }, line, below) : line
-  })
-
-  on('command.run', { command: 'cache-clock' }, async ($) => {
+  on('command.run', { command: 'cache' }, async ($) => {
     await readTtl($)
-    return { text: asText(snapshot(await $.clock.now())) }
+    return { text: statusLine(await $.clock.now()) }
   })
 }

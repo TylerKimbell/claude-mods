@@ -39,7 +39,7 @@ export type View = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'usage-credits': {
+    'usage': {
       credits: Credits | null
       windows: Windows
       view: View

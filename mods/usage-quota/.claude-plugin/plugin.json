@@ -1,7 +1,7 @@
 {
   "name": "usage-quota",
   "version": "0.2.0",
-  "description": "A compact context band above the prompt: context use with its breakdown, one-click Compact and per-session Auto compact. Fork of Anant Raghunath's usage-quota with the 5-hour and weekly meters removed (usage-credits shows those on the status line) and no polling of the usage endpoint.",
+  "description": "A compact context band above the prompt: context use with its breakdown, one-click Compact and per-session Auto compact. Fork of Anant Raghunath's usage-quota with the 5-hour and weekly meters removed (the usage mod shows those on the status line) and no polling of the usage endpoint.",
   "author": {
     "name": "Anant Raghunath",
     "url": "https://github.com/anantraghunath"

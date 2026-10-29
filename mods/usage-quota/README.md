@@ -16,8 +16,8 @@ Messages 419k   Tools 39k   Other 18k
 
 This is a fork of [Anant Raghunath's usage-quota](https://github.com/anantraghunath/claude-code-usage-quota-mod) 0.1.6 (MIT). The changes:
 
-- **No 5-hour or weekly meters, and no forecast.** [usage-credits](../usage-credits/README.md) shows the two windows on the status line under the prompt instead, so the band is three rows rather than ten.
-- **No polling of the usage endpoint.** The original asked it every two minutes for the meters; the endpoint rate-limits, and usage-credits reads it too.
+- **No 5-hour or weekly meters, and no forecast.** [usage](../usage/README.md) shows the two windows on the status line under the prompt instead, so the band is three rows rather than ten.
+- **No polling of the usage endpoint.** The original asked it every two minutes for the meters; the endpoint rate-limits, and the usage mod reads it too.
 - **The band is passed on.** The original drew its block without handing the band to the mods beneath it, so any mod installed after it lost its band row. This one draws its block and then the rows beneath it, so install order no longer hides anything.
 
 Install this one instead of the original, not alongside it.
