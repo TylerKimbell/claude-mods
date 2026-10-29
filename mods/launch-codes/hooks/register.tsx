@@ -14,9 +14,9 @@ const alert = atom({ plugin: 'launch-codes', key: 'alert' } as const, null as Al
 const off = atom({ plugin: 'launch-codes', key: 'isOff' } as const, false)
 
 // The status line entry under the prompt, headed by the plugin's name (the app adds it):
-// `launch-codes on`, or `launch-codes off · /launch-codes on to guard again`.
+// `launch-codes on` or `launch-codes off`.
 const ON_STATUS = 'on'
-const OFF_STATUS = 'off · /launch-codes on to guard again'
+const OFF_STATUS = 'off'
 const statusOf = (isOff: boolean) => (isOff ? OFF_STATUS : ON_STATUS)
 // Who may switch the guard off: the person, typing at a terminal (composer), through
 // Remote Control (bridge), or in a host such as the desktop app (sdk). Never a
