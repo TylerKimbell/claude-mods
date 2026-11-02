@@ -6,4 +6,4 @@ Tyler's Claude Code mods, as a plugin marketplace named `claude-mods`: one folde
 - **The CLI may not be on PATH.** The desktop app bundles it; `SETUP.md` step 2 says where.
 - **Changing a mod**: edit it under `mods/<name>`, then `claude plugin validate mods/<name>` and `claude plugin test mods/<name>` before committing. Installed from this folder, a change reaches sessions on `/reload-plugins`.
 - **Adding a mod**: copy `mods/_template`, add an entry to `.claude-plugin/marketplace.json` and a row to the README's table. Credit adapted code in `NOTICE`.
-- **Mods that draw in the band above the prompt** must pass the draw down (`await next(e)` and draw it with their own rows), or every mod beneath them disappears. Ours all do. Install order sets the band's layout: the first mod's row on top. The status line under the prompt is the other always-visible spot.
+- **Mods that draw in the band above the prompt** must pass the draw down (`await next(e)` and draw it with their own rows), or every mod beneath them disappears. Ours all do. The status line under the prompt is the other always-visible spot; its entries run left to right in install order.

@@ -8,7 +8,7 @@ Clone this repo, open Claude Code in the folder, and say:
 
 > Follow SETUP.md to install all the mods on this machine.
 
-[SETUP.md](SETUP.md) installs every mod below plus filetree, in the order that lays the band out, and checks the result.
+[SETUP.md](SETUP.md) installs every mod below plus filetree, in the order that lays the status line out, and checks the result.
 
 ## Install a mod
 

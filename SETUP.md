@@ -12,8 +12,8 @@ Every step is safe to run again on a machine that already has some of this insta
 | --- | --- | --- | --- |
 | 1 | `filetree@claude-code-filetree` | data-goblin/claude-code-filetree | Live file tree pane |
 | 2 | `agent-progress@claude-mods` | this repo | Claude and subagent bars, Agents pane |
-| 3 | `cache@claude-mods` | this repo | Cache countdown in the status line (our cache-clock fork) |
-| 4 | `cache-warmer@claude-mods` | this repo | Keeps big sessions' cache warm while idle |
+| 3 | `cache-warmer@claude-mods` | this repo | Keeps big sessions' cache warm while idle |
+| 4 | `cache@claude-mods` | this repo | Cache countdown in the status line (our cache-clock fork) |
 | 5 | `launch-codes@claude-mods` | this repo | Code-and-LAUNCH guard on risky commands and .env edits |
 | 6 | `usage@claude-mods` | this repo | 5-hour and weekly use and credits left, on the status line |
 | 7 | `ctx-info@claude-mods` | this repo | The context band: context use, Compact, Auto compact (our fork) |
@@ -27,7 +27,9 @@ Do **not** install these, on purpose:
 
 ## Install order
 
-Mods load in install order, and that order sets two layouts. The band above the prompt is drawn in it: the first mod's row on top, each passing the rest down. Every mod here passes the draw down, so the order hides nothing. The status line under the prompt lists each mod's entry in it too, left to right. So cache goes before launch-codes and usage (its countdown reads first), and ctx-info goes last so the context band sits right above the prompt. Step 7 checks both. To reorder later, uninstall the mods that should come later and install them again.
+Mods load in install order, and the status line under the prompt lists each mod's entry in that order, left to right. So cache, launch-codes and usage go in that order, which reads `cache ◷ … · launch-codes on · usage …`. cache-warmer's entry appears only after it has pinged (your next message clears it); installed before cache, it sits at the far left. filetree, agent-progress and ctx-info have no entry, so where they go does not matter to the status line. Step 6 checks the order. To reorder later, uninstall the mods that should come later and install them again.
+
+The band above the prompt does not follow install order in the same way. Each mod is handed the rows of the mods installed after it: agent-progress puts them above its own rows, ctx-info puts them below its own. So the context band sits above agent-progress's `Claude` bar whichever is installed first. Every mod here passes the draw down, so no order hides anything.
 
 ## Steps
 
@@ -77,28 +79,23 @@ claude plugin marketplace add data-goblin/claude-code-filetree
 
 The first one adds this clone as a folder marketplace named `claude-mods`. Plugins from it are read straight from the folder, so a `git pull` here plus `/reload-plugins` in a session is all an update needs. If `claude-mods` is already added from GitHub (`TylerKimbell/claude-mods`) instead, that works too; updates then go through `claude plugin marketplace update claude-mods` and `claude plugin update <id>`.
 
-### 5. Install the six, in this order
+### 5. Install the seven, in this order
 
 Skip any that step 3 showed as installed.
 
 ```bash
 claude plugin install filetree@claude-code-filetree --scope user
 claude plugin install agent-progress@claude-mods --scope user
-claude plugin install cache@claude-mods --scope user
 claude plugin install cache-warmer@claude-mods --scope user
+claude plugin install cache@claude-mods --scope user
 claude plugin install launch-codes@claude-mods --scope user
 claude plugin install usage@claude-mods --scope user
+claude plugin install ctx-info@claude-mods --scope user
 ```
 
 Messages about userConfig options not being set are expected: every mod's defaults are the setup. Nothing needs configuring.
 
-### 6. Install ctx-info last
-
-```bash
-claude plugin install ctx-info@claude-mods --scope user
-```
-
-### 7. Check the load order
+### 6. Check the load order
 
 A headless run loads every plugin and logs the order, even without a login.
 
@@ -109,21 +106,21 @@ grep -o "hooks module [a-z-]*@[a-z-]* loaded (worker, environment [0-9]*" "$T/mo
 rm "$T/mods-order.log"
 ```
 
-`claude plugin list` sorts by name, so it cannot show the order; this can. Expect seven lines, ctx-info last:
+`claude plugin list` sorts by name, so it cannot show the order; this can. Expect seven lines:
 
 ```
 hooks module filetree@claude-code-filetree loaded (worker, environment 1
 hooks module agent-progress@claude-mods loaded (worker, environment 2
-hooks module cache@claude-mods loaded (worker, environment 3
-hooks module cache-warmer@claude-mods loaded (worker, environment 4
+hooks module cache-warmer@claude-mods loaded (worker, environment 3
+hooks module cache@claude-mods loaded (worker, environment 4
 hooks module launch-codes@claude-mods loaded (worker, environment 5
 hooks module usage@claude-mods loaded (worker, environment 6
 hooks module ctx-info@claude-mods loaded (worker, environment 7
 ```
 
-The middle five may be in any order. If a line is missing, install that mod. If ctx-info is not last, nothing is hidden, but the context band is not at the bottom of the band: `claude plugin uninstall ctx-info@claude-mods` then step 6 moves it there. Any line naming `claude-code-mods` or `claude-code-usage-quota-mod` is an original that step 3 should have removed.
+What matters is that cache-warmer, cache, launch-codes and usage come in that order; the others may sit anywhere. If those four are out of order, uninstall the ones that should come later and install them again in order. If a line is missing, install that mod. Any line naming `claude-code-mods` or `claude-code-usage-quota-mod` is an original that step 3 should have removed.
 
-### 8. Load them and check them
+### 7. Load them and check them
 
 Restart the desktop app, or start a new session (in an open session, `/reload-plugins`). Then, in that session:
 
@@ -139,7 +136,7 @@ Restart the desktop app, or start a new session (in an open session, `/reload-pl
 And on screen, after sending any message:
 
 - The band above the prompt is the context band: `Context …% used  …k free of 1M` with Auto compact, Compact and ▼ beside it, the context bar, and a `Messages · Tools · Other` row. agent-progress's `Claude` bar sits beneath it, and its subagent bar joins whenever Claude runs subagents.
-- The status line under the prompt has `launch-codes on`, `cache ◷ 59:… left · 1h ttl` and `usage 5h …% · Weekly …% · $… left`, all on one row with no `+1` fold.
+- The status line under the prompt reads `cache ◷ 59:… left · 1h ttl`, `launch-codes on`, `usage 5h …% · Weekly …% · $… left`, left to right, all on one row with no `+1` fold. After cache-warmer pings, `cache warm · …` joins at the far left until your next message.
 - A Files tab (filetree) sits beside the chat.
 
 The first time a new mod loads, the desktop app may ask whether to allow it. Allow it.
@@ -148,5 +145,5 @@ The first time a new mod loads, the desktop app may ask whether to allow it. All
 
 - **Updating this repo's mods**: `git pull` in this folder, then `/reload-plugins` in open sessions.
 - **Updating filetree**: `claude plugin marketplace update claude-code-filetree` then `claude plugin update filetree@claude-code-filetree`.
-- **Adding another mod**: install it. To keep the context band at the bottom of the band, reinstall ctx-info afterwards (uninstall, then step 6) and check with step 7.
+- **Adding another mod**: install it. If it has a status line entry, that lands at the right end; to put it further left, uninstall the mods whose entries should follow it, install them again after it, and check with step 6.
 - **Removing everything**: `claude plugin uninstall <id>` for each id in the table.
