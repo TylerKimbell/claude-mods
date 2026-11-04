@@ -176,13 +176,26 @@ export const mergeWindows = (kept: Windows, fresh: Windows): Windows => {
 const percentNow = (w: Win | undefined, now: number): number | undefined =>
   w === undefined ? undefined : w.resetsAt !== undefined && Date.parse(w.resetsAt) <= now ? 0 : w.percent
 
-/** The whole status line: the two windows, then the credits. */
-export const lineOf = (c: Credits | null, w: Windows, now: number, showWindows = true): string | undefined => {
+/**
+ * A clock time like `3:09pm`. `offsetMin` is minutes behind UTC, as `Date#getTimezoneOffset`
+ * gives it; left out, the machine's own zone at that moment.
+ */
+export const fmtClock = (ms: number, offsetMin = new Date(ms).getTimezoneOffset()): string => {
+  const d = new Date(ms - offsetMin * 60_000)
+  const h = d.getUTCHours()
+  const m = d.getUTCMinutes()
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')}${h < 12 ? 'am' : 'pm'}`
+}
+
+/** The whole status line: the two windows, then the credits. The 5-hour window carries its reset time. */
+export const lineOf = (c: Credits | null, w: Windows, now: number, showWindows = true, offsetMin?: number): string | undefined => {
   const parts: string[] = []
   if (showWindows) {
     const five = percentNow(w.fiveHour, now)
     const week = percentNow(w.weekly, now)
-    if (five !== undefined) parts.push(`5h ${Math.round(five)}%`)
+    const fiveReset = w.fiveHour?.resetsAt ? Date.parse(w.fiveHour.resetsAt) : NaN
+    const resets = fiveReset > now ? ` (resets ${fmtClock(fiveReset, offsetMin)})` : ''
+    if (five !== undefined) parts.push(`5h ${Math.round(five)}%${resets}`)
     if (week !== undefined) parts.push(`Weekly ${Math.round(week)}%`)
   }
   const credits = c ? statusText(c) : undefined

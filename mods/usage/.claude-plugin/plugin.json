@@ -1,6 +1,6 @@
 {
   "name": "usage",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Your plan's 5-hour and weekly usage and your usage credits (the pool Fable draws on) on the status line under the prompt, refreshed from the session and your account, with a warning as a monthly limit nears.",
   "license": "MIT",
   "types": "./types/index.d.ts",
@@ -26,7 +26,7 @@
     "showWindows": {
       "type": "boolean",
       "title": "Show the 5-hour and weekly windows",
-      "description": "Put the plan's 5-hour and weekly usage on the status line, left of the credits",
+      "description": "Put the plan's 5-hour and weekly usage on the status line, left of the credits, with the time the 5-hour window resets",
       "default": true
     }
   }
