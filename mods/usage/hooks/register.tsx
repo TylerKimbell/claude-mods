@@ -194,7 +194,7 @@ export const lineOf = (c: Credits | null, w: Windows, now: number, showWindows =
     const five = percentNow(w.fiveHour, now)
     const week = percentNow(w.weekly, now)
     const fiveReset = w.fiveHour?.resetsAt ? Date.parse(w.fiveHour.resetsAt) : NaN
-    const resets = fiveReset > now ? ` (resets ${fmtClock(fiveReset, offsetMin)})` : ''
+    const resets = fiveReset > now ? ` ${fmtClock(fiveReset, offsetMin)}` : ''
     if (five !== undefined) parts.push(`5h ${Math.round(five)}%${resets}`)
     if (week !== undefined) parts.push(`Weekly ${Math.round(week)}%`)
   }

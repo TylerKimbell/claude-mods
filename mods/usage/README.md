@@ -3,7 +3,7 @@
 Your plan's 5-hour and weekly use and your usage credits, in the status line under the prompt.
 
 ```
-usage  5h 10% (resets 3:40pm) · Weekly 2% · $91.49 left
+usage  5h 10% 3:40pm · Weekly 2% · $91.49 left
 ```
 
 **5h** and **Weekly** are the plan's two rate-limit windows. They come from the engine after every reply, at no cost, and from the account's usage endpoint (described under "Where the numbers come from" below). Within one window the higher reading stands, since the per-reply figures are whole percents and can lag the service. The 5-hour window shows the clock time it resets, in your time zone; the weekly one leaves it off to keep the line short (`/credits` has both). A window whose reset has passed reads 0% and drops the time. The `showWindows` option takes them off the line.
