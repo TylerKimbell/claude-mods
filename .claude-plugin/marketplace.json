@@ -33,11 +33,6 @@
       "name": "ctx-info",
       "source": "./mods/ctx-info",
       "description": "A compact context band above the prompt: context use with its breakdown, one-click Compact and per-session Auto compact. Fork of Anant Raghunath's usage-quota without the 5-hour and weekly meters (the usage mod shows those) and without polling."
-    },
-    {
-      "name": "mod-template",
-      "source": "./mods/_template",
-      "description": "Starter mod: copy this folder to begin a new mod."
     }
   ]
 }

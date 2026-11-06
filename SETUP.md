@@ -136,7 +136,7 @@ Restart the desktop app, or start a new session (in an open session, `/reload-pl
 And on screen, after sending any message:
 
 - The band above the prompt is the context band: `Context …% used  …k free of 1M` with Auto compact, Compact and ▼ beside it, the context bar, and a `Messages · Tools · Other` row. agent-progress's `Claude` bar sits beneath it, and its subagent bar joins whenever Claude runs subagents.
-- The status line under the prompt reads `cache ◷ 59:… left · 1h ttl`, `launch-codes on`, `usage 5h …% · Weekly …% · $… left`, left to right, all on one row with no `+1` fold. After cache-warmer pings, `cache warm · …` joins at the far left until your next message.
+- The status line under the prompt reads `cache ◷ 59:… left · 1h ttl`, `launch-codes on`, `usage 5h …% <reset time> · Weekly …% · $… left`, left to right, all on one row with no `+1` fold. After cache-warmer pings, `cache warm · …` joins at the far left until your next message.
 - A Files tab (filetree) sits beside the chat.
 
 The first time a new mod loads, the desktop app may ask whether to allow it. Allow it.
