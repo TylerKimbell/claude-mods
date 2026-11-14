@@ -26,36 +26,19 @@ claude plugin install filetree --marketplace data-goblin/claude-code-filetree
 
 ## Install the mods
 
-All three ways need Claude Code 2.1.287 or later.
+Both ways need Claude Code 2.1.287 or later. Mods run only in Claude Code, and each install is for one machine: repeat it on every machine where you want the mods.
 
-### From claude.ai, for every machine
+### From the Claude desktop app
 
-Mods you add to your claude.ai account load in Claude Code on every machine where you sign in with that account.
+1. Switch to **Code** in the desktop app.
+2. Open **Plugins**.
+3. Scroll to the bottom, to the **On your computer** section, and add the marketplace `TylerKimbell/claude-mods` there.
+4. Choose the mods you want from that marketplace.
+5. Start a new session, or run `/reload-plugins` in an open one.
 
-1. On [claude.ai](https://claude.ai/customize/plugins), or in the Claude desktop app, open **Customize > Plugins**.
-2. Choose **Add > Add marketplace** and enter `TylerKimbell/claude-mods`.
-3. Open each mod you want and select **Add**.
-4. Start a new Claude Code session, or run `/reload-plugins` in an open one.
+Don't add the marketplace under **Customize > Plugins**, on claude.ai or in the desktop app's chat. The marketplace syncs there, but none of its mods are offered to add.
 
-Know these limits:
-
-- Mods run only in Claude Code. Chat on claude.ai and Cowork ignore them.
-- A session signed in with an API key or a token does not get synced mods.
-- `/plugin` and `claude plugin list` show synced mods as `<mod>@synced`.
-
-To manage synced mods:
-
-- **Update them:** select **Check for updates** on the marketplace in **Customize > Plugins**, or turn on **Sync automatically**.
-- **Turn one off on one machine:** run `claude plugin disable <mod>@synced`.
-- **Remove one everywhere:** remove it on claude.ai.
-- **Install each mod one way only:** if Claude Code also has a mod from a marketplace, that copy loads and the synced copy does not.
-- **Leave out the originals:** don't add Ray Amjad's cache-clock or Anant Raghunath's usage-quota alongside `cache` and `ctx-info`. Each pair draws its reading twice.
-
-SETUP.md's install order covers installs made in Claude Code. The load order of synced mods is untested, so their status line entries can sit in a different order.
-
-### From Claude Code, for one machine
-
-Mods installed this way stay on this machine and are not added to your claude.ai account.
+### From the Claude Code command line
 
 At the prompt of a terminal `claude` session:
 
@@ -69,14 +52,13 @@ From a shell:
 claude plugin install <mod> --marketplace TylerKimbell/claude-mods
 ```
 
-### From the Claude desktop app, for one machine
+`/plugin` does not run in the desktop app. Use the steps above there.
 
-`/plugin` does not run in the desktop app. Use the menu instead:
+### After installing
 
-1. Click **+** next to the prompt box, then **Plugins**.
-2. Choose **Add marketplace** and enter `TylerKimbell/claude-mods`.
-3. Choose **Add plugin** for each mod you want.
-4. Start a new session, or run `/reload-plugins` in an open one.
+- **Install each mod one way only.** A mod added twice, from two marketplaces or two routes, can draw its reading twice.
+- **Leave out the originals.** Don't add Ray Amjad's cache-clock or Anant Raghunath's usage-quota alongside `cache` and `ctx-info`. Each pair draws its reading twice.
+- **Updates** come from this repo's default branch. Update the marketplace where you added it, then run `/reload-plugins`.
 
 ### Same setup on a new machine
 
