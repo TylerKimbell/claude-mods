@@ -1,6 +1,6 @@
 # Set up a machine
 
-This puts Tyler's full mod setup on a machine: the six mods in this repo plus filetree from another author. It is written for Claude Code to follow. Open Claude Code in this folder and say:
+This puts Tyler's full mod setup on a machine: the five mods in this repo plus filetree from another author. It is written for Claude Code to follow. Open Claude Code in this folder and say:
 
 > Follow SETUP.md to install all the mods on this machine.
 
@@ -14,20 +14,20 @@ Every step is safe to run again on a machine that already has some of this insta
 | 2 | `agent-progress@claude-mods` | this repo | Claude and subagent bars, Agents pane |
 | 3 | `cache-warmer@claude-mods` | this repo | Keeps big sessions' cache warm while idle |
 | 4 | `cache@claude-mods` | this repo | Cache countdown in the status line (our cache-clock fork) |
-| 5 | `launch-codes@claude-mods` | this repo | Code-and-LAUNCH guard on risky commands and .env edits |
-| 6 | `usage@claude-mods` | this repo | 5-hour and weekly use and credits left, on the status line |
-| 7 | `ctx-info@claude-mods` | this repo | The context band: context use, Compact, Auto compact (our fork) |
+| 5 | `usage@claude-mods` | this repo | 5-hour and weekly use and credits left, on the status line |
+| 6 | `ctx-info@claude-mods` | this repo | The context band: context use, Compact, Auto compact (our fork) |
 
 Do **not** install these, on purpose:
 
 - `cache-clock@claude-code-mods` (Ray Amjad's original). Ours in `mods/cache` replaces it. Both together draw two countdowns.
 - `cache-clock@claude-mods` and `usage-credits@claude-mods`: the earlier names of `cache` and `usage`. Each pair together draws its status entry twice.
 - `usage-quota@claude-code-usage-quota-mod` (Anant Raghunath's original). Ours, `ctx-info` in `mods/ctx-info`, replaces it. The original also draws the 5-hour and weekly meters, polls the usage endpoint every two minutes (which gets refused with 429s), and hides every band row installed after it.
+- `launch-codes@claude-mods`: removed from this repo. Its code prompts on risky commands got in the way more than they helped. Step 3 uninstalls it.
 - next-steps (spends tokens every turn) and secret-box (not needed).
 
 ## Install order
 
-Mods load in install order, and the status line under the prompt lists each mod's entry in that order, left to right. So cache, launch-codes and usage go in that order, which reads `cache ◷ … · launch-codes on · usage …`. cache-warmer's entry appears only after it has pinged (your next message clears it); installed before cache, it sits at the far left. filetree, agent-progress and ctx-info have no entry, so where they go does not matter to the status line. Step 6 checks the order. To reorder later, uninstall the mods that should come later and install them again.
+Mods load in install order, and the status line under the prompt lists each mod's entry in that order, left to right. So cache and usage go in that order, which reads `cache ◷ … · usage …`. cache-warmer's entry appears only after it has pinged (your next message clears it); installed before cache, it sits at the far left. filetree, agent-progress and ctx-info have no entry, so where they go does not matter to the status line. Step 6 checks the order. To reorder later, uninstall the mods that should come later and install them again.
 
 The band above the prompt does not follow install order in the same way. Each mod is handed the rows of the mods installed after it: agent-progress puts them above its own rows, ctx-info puts them below its own. So the context band sits above agent-progress's `Claude` bar whichever is installed first. Every mod here passes the draw down, so no order hides anything.
 
@@ -56,7 +56,7 @@ claude plugin list --json
 claude plugin marketplace list --json
 ```
 
-Then, before installing anything, remove the originals our forks replace, if they are installed:
+Then, before installing anything, remove the originals our forks replace and the mod this repo dropped, if they are installed:
 
 ```bash
 claude plugin uninstall cache-clock@claude-code-mods
@@ -64,9 +64,10 @@ claude plugin uninstall usage-quota@claude-code-usage-quota-mod
 claude plugin uninstall usage-quota@claude-mods
 claude plugin uninstall cache-clock@claude-mods
 claude plugin uninstall usage-credits@claude-mods
+claude plugin uninstall launch-codes@claude-mods
 ```
 
-The last three are the earlier names of `ctx-info`, `cache` and `usage`; an uninstall of a plugin that is not installed just says so.
+The third, fourth and fifth are the earlier names of `ctx-info`, `cache` and `usage`, and the last is the removed guard mod; an uninstall of a plugin that is not installed just says so.
 
 ### 4. Add the two marketplaces
 
@@ -79,7 +80,7 @@ claude plugin marketplace add data-goblin/claude-code-filetree
 
 The first one adds this clone as a folder marketplace named `claude-mods`. Plugins from it are read straight from the folder, so a `git pull` here plus `/reload-plugins` in a session is all an update needs. If `claude-mods` is already added from GitHub (`TylerKimbell/claude-mods`) instead, that works too; updates then go through `claude plugin marketplace update claude-mods` and `claude plugin update <id>`.
 
-### 5. Install the seven, in this order
+### 5. Install the six, in this order
 
 Skip any that step 3 showed as installed.
 
@@ -88,7 +89,6 @@ claude plugin install filetree@claude-code-filetree --scope user
 claude plugin install agent-progress@claude-mods --scope user
 claude plugin install cache-warmer@claude-mods --scope user
 claude plugin install cache@claude-mods --scope user
-claude plugin install launch-codes@claude-mods --scope user
 claude plugin install usage@claude-mods --scope user
 claude plugin install ctx-info@claude-mods --scope user
 ```
@@ -106,19 +106,18 @@ grep -o "hooks module [a-z-]*@[a-z-]* loaded (worker, environment [0-9]*" "$T/mo
 rm "$T/mods-order.log"
 ```
 
-`claude plugin list` sorts by name, so it cannot show the order; this can. Expect seven lines:
+`claude plugin list` sorts by name, so it cannot show the order; this can. Expect six lines:
 
 ```
 hooks module filetree@claude-code-filetree loaded (worker, environment 1
 hooks module agent-progress@claude-mods loaded (worker, environment 2
 hooks module cache-warmer@claude-mods loaded (worker, environment 3
 hooks module cache@claude-mods loaded (worker, environment 4
-hooks module launch-codes@claude-mods loaded (worker, environment 5
-hooks module usage@claude-mods loaded (worker, environment 6
-hooks module ctx-info@claude-mods loaded (worker, environment 7
+hooks module usage@claude-mods loaded (worker, environment 5
+hooks module ctx-info@claude-mods loaded (worker, environment 6
 ```
 
-What matters is that cache-warmer, cache, launch-codes and usage come in that order; the others may sit anywhere. If those four are out of order, uninstall the ones that should come later and install them again in order. If a line is missing, install that mod. Any line naming `claude-code-mods` or `claude-code-usage-quota-mod` is an original that step 3 should have removed.
+What matters is that cache-warmer, cache and usage come in that order; the others may sit anywhere. If those three are out of order, uninstall the ones that should come later and install them again in order. If a line is missing, install that mod. Any line naming `claude-code-mods`, `claude-code-usage-quota-mod` or `launch-codes` is one that step 3 should have removed.
 
 ### 7. Load them and check them
 
@@ -126,7 +125,6 @@ Restart the desktop app, or start a new session (in an open session, `/reload-pl
 
 | Type | Expect |
 | --- | --- |
-| `/launch-codes test git push --force` | `Needs launch codes: git push --force rewrites remote history.` |
 | `/credits` | `Plan: 5-hour …% (resets in …) · weekly …% (resets in …)`, then `Usage credits: $… left · …` |
 | `/warmer` | `Cache warmer on · …` |
 | `/cache` | the countdown line as text |
@@ -136,7 +134,7 @@ Restart the desktop app, or start a new session (in an open session, `/reload-pl
 And on screen, after sending any message:
 
 - The band above the prompt is the context band: `Context …% used  …k free of 1M` with Auto compact, Compact and ▼ beside it, the context bar, and a `Messages · Tools · Other` row. agent-progress's `Claude` bar sits beneath it, and its subagent bar joins whenever Claude runs subagents.
-- The status line under the prompt reads `cache ◷ 59:… left · 1h ttl`, `launch-codes on`, `usage 5h …% <reset time> · Weekly …% · $… left`, left to right, all on one row with no `+1` fold. After cache-warmer pings, `cache warm · …` joins at the far left until your next message.
+- The status line under the prompt reads `cache ◷ 59:… left · 1h ttl`, `usage 5h …% <reset time> · Weekly …% · $… left`, left to right, all on one row with no `+1` fold. After cache-warmer pings, `cache warm · …` joins at the far left until your next message.
 - A Files tab (filetree) sits beside the chat.
 
 The first time a new mod loads, the desktop app may ask whether to allow it. Allow it.

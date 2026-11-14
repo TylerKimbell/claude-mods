@@ -1,6 +1,6 @@
 # claude-mods
 
-Mods for Claude Code: a context band above the prompt, cache and usage readings in the status line under it, an Agents pane, and a guard on risky commands. Claude Code calls mods plugins, so the menus and commands below say "plugin".
+Mods for Claude Code: a context band above the prompt, cache and usage readings in the status line under it, and an Agents pane. Claude Code calls mods plugins, so the menus and commands below say "plugin".
 
 ## Mods
 
@@ -11,7 +11,6 @@ In install order, the order [SETUP.md](SETUP.md) uses:
 | [`agent-progress`](mods/agent-progress/README.md) | A progress bar above the prompt for Claude's work and the subagents it starts. An Agents pane shows each one's model, step progress, context, estimated cost, and time. `/subagents` opens and closes the pane. |
 | [`cache-warmer`](mods/cache-warmer/README.md) | Keeps a big session's prompt cache warm while you are away. A few minutes before the cache expires, it sends one cheap request over the cached transcript. It stops after 4 idle hours and skips sessions under 100k tokens. `/warmer` shows the pings, their cost, and what a cold return would have cost. |
 | [`cache`](mods/cache/README.md) | `cache ◷ 59:43 left · 1h ttl` in the status line: a countdown until the prompt cache goes cold. `/cache` prints it. |
-| [`launch-codes`](mods/launch-codes/README.md) | Risky Bash and PowerShell commands and `.env` edits need a 4-character code that you type, then a LAUNCH. Risky commands include `rm -rf`, force pushes, `reset --hard`, `DROP TABLE`, and `curl` piped into `sh`. The status line shows whether it is on. `/launch-codes test <command>` checks a command. |
 | [`usage`](mods/usage/README.md) | `usage 5h 10% 3:40pm · Weekly 2% · $91.49 left` in the status line: the plan's 5-hour window with its reset time, the weekly window, and your purchased credit balance. `/credits` adds both reset countdowns and this month's spend. |
 | [`ctx-info`](mods/ctx-info/README.md) | The context band above the prompt: context use split into Messages, Tools, and Other, a Compact button, and an Auto compact switch for the session. `/ctx-info` turns the band off and on. |
 
