@@ -95,7 +95,7 @@ claude plugin validate mods/<name>
 claude plugin test mods/<name>
 ```
 
-CI runs both commands on every mod, and `claude plugin validate .` on the marketplace manifest, on each push and pull request.
+On each push and pull request, CI validates every mod and the marketplace manifest (`claude plugin validate .`), and runs the tests of every mod that has a test file.
 
 ## Add a mod to the marketplace
 

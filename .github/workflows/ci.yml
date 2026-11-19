@@ -44,8 +44,10 @@ jobs:
           failed=0
           for mod in mods/*/; do
             mod="${mod%/}"
-            # `claude plugin test` exits 1 on a mod with no test files.
-            if [ ! -d "$mod/tests" ]; then
+            # `claude plugin test` exits 1 on a mod with no test files. It runs a test file
+            # in any folder of the mod, so look for one anywhere, not only under tests/.
+            tests="$(find "$mod" -name node_modules -prune -o \( -name '*.test.ts' -o -name '*.test.tsx' \) -print)"
+            if [ -z "$tests" ]; then
               echo "$mod has no tests"
               continue
             fi
