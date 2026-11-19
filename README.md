@@ -95,6 +95,8 @@ claude plugin validate mods/<name>
 claude plugin test mods/<name>
 ```
 
+On each push and pull request, CI validates every mod and the marketplace manifest (`claude plugin validate .`), and runs the tests of every mod that has a test file.
+
 ## Add a mod to the marketplace
 
 1. Copy `mods/_template` to `mods/<name>`. Set `name` and `description` in `.claude-plugin/plugin.json`.

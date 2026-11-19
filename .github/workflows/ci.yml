@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Repository checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Claude Code
+        run: |
+          npm install --global @anthropic-ai/claude-code
+          claude --version
+
+      - name: Validate the marketplace manifest
+        run: claude plugin validate .
+
+      - name: Validate each mod
+        run: |
+          failed=0
+          for mod in mods/*/; do
+            mod="${mod%/}"
+            echo "::group::$mod"
+            claude plugin validate "$mod" || { failed=1; failures="$failures $mod"; }
+            echo "::endgroup::"
+          done
+          for mod in $failures; do
+            echo "::error::claude plugin validate $mod failed"
+          done
+          exit "$failed"
+
+      - name: Run each mod's tests
+        run: |
+          failed=0
+          for mod in mods/*/; do
+            mod="${mod%/}"
+            # `claude plugin test` exits 1 on a mod with no test files. It runs a test file
+            # in any folder of the mod, so look for one anywhere, not only under tests/.
+            tests="$(find "$mod" -name node_modules -prune -o \( -name '*.test.ts' -o -name '*.test.tsx' \) -print)"
+            if [ -z "$tests" ]; then
+              echo "$mod has no tests"
+              continue
+            fi
+            echo "::group::$mod"
+            claude plugin test "$mod" || { failed=1; failures="$failures $mod"; }
+            echo "::endgroup::"
+          done
+          for mod in $failures; do
+            echo "::error::claude plugin test $mod failed"
+          done
+          exit "$failed"
